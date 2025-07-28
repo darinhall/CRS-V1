@@ -14,60 +14,158 @@ All the below code was created using Claude. Used as a test scraper to see what 
 
 class CanonDataScraper:
     def __init__(self):
-        self.base_url = "https://www.usa.canon.com/shop/p/cameras" #this is a general url, needs to be updated to the specific category of interest
+        self.base_url = "https://www.usa.canon.com" #general url used for canon website
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
         
-    def find_camera_pages(self, search_terms=['camera', 'lens', 'dslr', 'mirrorless']):
-        """Find camera-related pages from sitemap or by crawling"""
+    def find_body_pages(self, search_terms=['camera', 'lens', 'dslr', 'mirrorless'], max_load_more=5):
+        """Find camera-related pages by handling 'Load More' buttons and specific product links"""
         camera_urls = []
         
-        # Try to get sitemap first
-        sitemap_urls = [
-            f"{self.base_url}/sitemap.xml",
-            f"{self.base_url}/robots.txt"
+        # Target specific Canon product pages
+        target_urls = [
+            "https://www.usa.canon.com/shop/digital-cameras/mirrorless-cameras",
+            "https://www.usa.canon.com/shop/digital-cameras/dslr-cameras",
+            "https://www.usa.canon.com/shop/cameras"
         ]
         
-        for sitemap_url in sitemap_urls:
+        for target_url in target_urls:
             try:
-                response = self.session.get(sitemap_url)
-                if response.status_code == 200:
-                    if 'sitemap' in response.text.lower():
-                        urls = self.get_sitemap_urls(sitemap_url)
-                        camera_urls.extend([url for url in urls if any(term in url.lower() for term in search_terms)])
-                        break
-            except:
+                print(f"Scraping from: {target_url}")
+                camera_urls.extend(self._scrape_with_load_more(target_url, max_load_more))
+                
+                if camera_urls:  # If we found URLs, we can stop
+                    break
+                    
+            except Exception as e:
+                print(f"Error accessing {target_url}: {e}")
                 continue
         
-        # Currently set so if no sitemap, try manual discovery, but need to change to prioritize manual discovery
-        if not camera_urls:
-            try:
-                # Try common camera section URLs
-                camera_sections = [
-                    f"{self.base_url}/cameras",
-                    f"{self.base_url}/products/cameras",
-                    f"{self.base_url}/en/cameras"
-                ]
-                
-                for section_url in camera_sections:
-                    try:
-                        response = self.session.get(section_url)
-                        if response.status_code == 200:
-                            soup = BeautifulSoup(response.content, 'html.parser')
-                            links = soup.find_all('a', href=True)
-                            for link in links:
-                                href = urljoin(section_url, link['href'])
-                                if any(term in href.lower() for term in search_terms):
-                                    camera_urls.append(href)
-                            break
-                    except:
-                        continue
-            except Exception as e:
-                print(f"Error in manual discovery: {e}")
+        return list(set(camera_urls))[0:20]  # Return up to 20 unique URLs
+
+    def _scrape_with_load_more(self, url, max_load_more=5):
+        """Scrape product URLs from a page with 'Load More' functionality"""
+        product_urls = []
         
-        return list(set(camera_urls))[0:3]  # Limit to 3 for testing scrape_website_specs
+        try:
+            # Get the initial page
+            response = self.session.get(url)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Extract product links from initial page
+            product_urls.extend(self._extract_product_links(soup, url))
+            print(f"  Found {len(product_urls)} products on initial page")
+            
+            # Look for and handle "Load More" button
+            load_more_count = 0
+            while load_more_count < max_load_more:
+                # Find "Load More" button
+                load_more_button = self._find_load_more_button(soup)
+                
+                if not load_more_button:
+                    print(f"  No more 'Load More' button found after {load_more_count} clicks")
+                    break
+                
+                # Click "Load More" (simulate AJAX request)
+                new_products = self._handle_load_more(url, load_more_count + 1)
+                if new_products:
+                    product_urls.extend(new_products)
+                    print(f"  Loaded {len(new_products)} more products (total: {len(product_urls)})")
+                    load_more_count += 1
+                    time.sleep(2)  # Be respectful
+                else:
+                    print(f"  No more products loaded after {load_more_count} clicks")
+                    break
+            
+        except Exception as e:
+            print(f"Error in _scrape_with_load_more: {e}")
+        
+        return product_urls
+
+    def _extract_product_links(self, soup, base_url):
+        """Extract product URLs from the page HTML"""
+        product_urls = []
+        
+        # Look for links with class "product-item-link" (as you specified)
+        product_links = soup.find_all('a', class_='product-item-link')
+        
+        for link in product_links:
+            href = link.get('href')
+            if href:
+                # Check if it's a product page (starts with /shop/p/)
+                if href.startswith('/shop/p/') or 'shop/p/' in href:
+                    full_url = urljoin(base_url, href)
+                    product_urls.append(full_url)
+        
+        # Also look for any links that contain the product pattern
+        all_links = soup.find_all('a', href=True)
+        for link in all_links:
+            href = link.get('href')
+            if href and ('/shop/p/' in href or href.startswith('/shop/p/')):
+                full_url = urljoin(base_url, href)
+                if full_url not in product_urls:
+                    product_urls.append(full_url)
+        
+        return product_urls
+
+    def _find_load_more_button(self, soup):
+        """Find 'Load More' button in the page"""
+        # Common selectors for "Load More" buttons
+        load_more_selectors = [
+            'button[class*="load-more"]',
+            'button[class*="loadmore"]',
+            'a[class*="load-more"]',
+            'a[class*="loadmore"]',
+            'button:contains("Load More")',
+            'a:contains("Load More")',
+            '[data-action="load-more"]',
+            '[id*="load-more"]',
+            '[class*="load-more"]'
+        ]
+        
+        for selector in load_more_selectors:
+            button = soup.select_one(selector)
+            if button:
+                return button
+        
+        # Also look for buttons with "Load More" text
+        buttons = soup.find_all(['button', 'a'])
+        for button in buttons:
+            if 'load more' in button.get_text().lower():
+                return button
+        
+        return None
+
+    def _handle_load_more(self, base_url, page_number):
+        """Handle the AJAX request for loading more products"""
+        try:
+            # Common patterns for "Load More" AJAX endpoints
+            ajax_patterns = [
+                f"{base_url}?page={page_number}",
+                f"{base_url}?p={page_number}",
+                f"{base_url}?offset={page_number * 12}",  # Common offset pattern
+                f"{base_url}?limit={page_number * 12}",
+            ]
+            
+            for ajax_url in ajax_patterns:
+                try:
+                    response = self.session.get(ajax_url)
+                    if response.status_code == 200:
+                        soup = BeautifulSoup(response.content, 'html.parser')
+                        new_products = self._extract_product_links(soup, base_url)
+                        if new_products:
+                            return new_products
+                except:
+                    continue
+            
+            return []
+            
+        except Exception as e:
+            print(f"Error handling load more: {e}")
+            return []
     
     def scrape_website_specs(self, url):
         """Scrape camera specifications from Canon website"""
@@ -150,8 +248,10 @@ class CanonDataScraper:
     
 # Usage example
 if __name__ == "__main__":
-    scraper = CanonDataScraper()
-    camera_urls = scraper.find_camera_pages()
+    scraper = CanonDataScraper()  # This calls __init__ automatically
+    # Scrape up to 10 "Load More" clicks
+    camera_urls = scraper.find_body_pages(max_load_more=10)
+    print(f"Found {len(camera_urls)} camera URLs")
     results = []
     for url in camera_urls:
         results.append(scraper.scrape_website_specs(url))

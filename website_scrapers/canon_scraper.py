@@ -15,7 +15,7 @@ All the below code was created using Claude. Used as a test scraper to see what 
 
 class CanonDataScraper:
     def __init__(self):
-        self.base_url = "https://www.canon.com"
+        self.base_url = "https://www.usa.canon.com/shop/p/cameras" #this is a general url, needs to be updated to the specific category of interest
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -335,10 +335,3 @@ if __name__ == "__main__":
     # Save results
     with open('canon_scraping_comparison.json', 'w') as f:
         json.dump(results, f, indent=2)
-    
-    print("\n✅ Comparison complete! Results saved to 'canon_scraping_comparison.json'")
-    print("\nNext steps:")
-    print("1. Review the quality of extracted data")
-    print("2. Identify which method gives more complete specifications")
-    print("3. Consider hybrid approach using both methods")
-    print("4. Test with other manufacturers (Sony, Nikon, etc.)")

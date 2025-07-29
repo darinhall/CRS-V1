@@ -2,7 +2,7 @@
 
 # === CONFIG ===
 ENV_NAME="website_scrapers_env"
-PYTHON_VERSION="python3"  # change if using pyenv or custom install
+PYTHON_VERSION="python3" 
 
 # === CREATE ENVIRONMENT ===
 echo "Creating virtual environment: $ENV_NAME"

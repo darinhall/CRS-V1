@@ -27,9 +27,10 @@ class CanonDataScraper:
         
         # Target specific Canon product pages
         target_urls = [
+            "https://www.usa.canon.com/shop/digital-cameras"
             "https://www.usa.canon.com/shop/digital-cameras/mirrorless-cameras",
             "https://www.usa.canon.com/shop/digital-cameras/dslr-cameras",
-            "https://www.usa.canon.com/shop/cameras"
+            "https://www.usa.canon.com/shop/digital-cameras/point-and-shoot-cameras"
         ]
         
         for target_url in target_urls:

@@ -9,7 +9,7 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 '''
-All the below code was created using Claude. Used as a test scraper to see what information may be able to be extracted from Canon's website. 
+This is a scraper for the Canon website. It is used to scrape the main canon shop page to find all the items on Canon's website currently for sale.
 '''
 
 class CanonDataScraper:
@@ -19,8 +19,9 @@ class CanonDataScraper:
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
-        
-    def find_body_pages(self, search_terms=['camera', 'lens', 'dslr', 'mirrorless'], max_load_more=5):
+
+    # Finds individual product pages for camera bodies    
+    def find_body_pages(self, search_terms=['dslr', 'mirrorless', 'EOS', 'Kit', 'PowerShot'], max_load_more=5):
         """Find camera-related pages by handling 'Load More' buttons and specific product links"""
         camera_urls = []
         
@@ -44,6 +45,64 @@ class CanonDataScraper:
                 continue
         
         return list(set(camera_urls))[0:20]  # Return up to 20 unique URLs
+
+    # Finds individual product pages for camera lenses
+    def find_lens_pages(self, search_terms=['EF', 'RF', 'lens', 'EF-S'], max_load_more=5):
+        """Find lens-related pages by handling 'Load More' buttons and specific product links"""
+        lens_urls = []
+        
+        # Target specific Canon product pages
+        target_urls = [
+            "https://www.usa.canon.com/shop/lenses/ef-lenses",
+            "https://www.usa.canon.com/shop/lenses/rf-lenses",
+            "https://www.usa.canon.com/shop/lenses/ef-s-lenses",
+            "https://www.usa.canon.com/shop/lenses/lenses"
+        ]
+        
+        for target_url in target_urls:
+            try:
+                print(f"Scraping from: {target_url}")
+                lens_urls.extend(self._scrape_with_load_more(target_url, max_load_more))
+                
+                if lens_urls:  # If we found URLs, we can stop
+                    break
+
+            except Exception as e:
+                print(f"Error accessing {target_url}: {e}")
+                continue
+        
+        return list(set(lens_urls))[0:20]  # Return up to 20 unique URLs
+
+    # Finds individual product pages for camera accessories
+    def find_accessory_pages(self, search_terms=['accessory', 'accessories', 'accessory kit', 'accessory set'], max_load_more=5):
+        """Find accessory-related pages by handling 'Load More' buttons and specific product links"""
+        accessory_urls = []
+        
+        # Target specific Canon product pages
+        target_urls = [
+            "https://www.usa.canon.com/shop/accessories/accessories",
+            "https://www.usa.canon.com/shop/accessories/accessory-kits",
+            "https://www.usa.canon.com/shop/accessories/accessory-sets",
+            "https://www.usa.canon.com/shop/accessories/lenses",
+            "https://www.usa.canon.com/shop/accessories/lenses/ef-lenses",
+            "https://www.usa.canon.com/shop/accessories/lenses/rf-lenses",
+            "https://www.usa.canon.com/shop/accessories/lenses/ef-s-lenses",
+            "https://www.usa.canon.com/shop/accessories/lenses/lenses"
+        ]
+        
+        for target_url in target_urls:
+            try:
+                print(f"Scraping from: {target_url}")
+                accessory_urls.extend(self._scrape_with_load_more(target_url, max_load_more))
+                
+                if accessory_urls:  # If we found URLs, we can stop
+                    break
+                
+            except Exception as e:
+                print(f"Error accessing {target_url}: {e}")
+                continue
+        
+        return list(set(accessory_urls))[0:20]  # Return up to 20 unique URLs
 
     def _scrape_with_load_more(self, url, max_load_more=5):
         """Scrape product URLs from a page with 'Load More' functionality"""

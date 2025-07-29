@@ -17,35 +17,75 @@ class CanonDataScraper:
         self.base_url = "https://www.usa.canon.com" #general url used for canon website
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
         })
 
-    # Finds individual product pages for camera bodies    
-    def find_body_pages(self, search_terms=['dslr', 'mirrorless', 'EOS', 'Kit', 'PowerShot'], max_load_more=5):
-        """Find camera-related pages by handling 'Load More' buttons and specific product links"""
+    def find_body_pages(self):
+        """Finds individual product pages for camera bodies, prases through https://www.usa.canon.com/shop/digital-cameras"""
         camera_urls = []
         
-        # Target specific Canon product pages
-        target_urls = [
-            "https://www.usa.canon.com/shop/digital-cameras"
-            "https://www.usa.canon.com/shop/digital-cameras/mirrorless-cameras",
-            "https://www.usa.canon.com/shop/digital-cameras/dslr-cameras",
-            "https://www.usa.canon.com/shop/digital-cameras/point-and-shoot-cameras"
-        ]
+        # Get the initial page
+        response = self.session.get(self.base_url)
+        # response.raise_for_status()  # Comment this out for testing
         
-        for target_url in target_urls:
-            try:
-                print(f"Scraping from: {target_url}")
-                camera_urls.extend(self._scrape_with_load_more(target_url, max_load_more))
-                
-                if camera_urls:  # If we found URLs, we can stop
-                    break
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Target specific Canon product pages
+            target_urls = [
+                "https://www.usa.canon.com/shop/digital-cameras"
+                "https://www.usa.canon.com/shop/digital-cameras/mirrorless-cameras",
+                "https://www.usa.canon.com/shop/digital-cameras/dslr-cameras",
+                "https://www.usa.canon.com/shop/digital-cameras/point-and-shoot-cameras"
+            ]
+
+            for target_url in target_urls:
+                try:
+                    print(f"Scraping from: {target_url}")
+                    camera_urls.extend(self._extract_product_links(soup, target_url))
                     
-            except Exception as e:
-                print(f"Error accessing {target_url}: {e}")
-                continue
+                    if camera_urls:  # If we found URLs, we can stop
+                        print(f"  Found {len(camera_urls)} products on initial page")
+                        break
+                        
+                except Exception as e:
+                    print(f"Error accessing {target_url}: {e}")
+                    continue
+            
+            return list(set(camera_urls))[0:20]  # Return up to 20 unique URLs
+        else:
+            print(f"Got status code: {response.status_code}")
+            return []
+
+    def _extract_product_links(self, soup, base_url):
+        """Extract product URLs from main page HTML"""
+        product_urls = []
         
-        return list(set(camera_urls))[0:20]  # Return up to 20 unique URLs
+        # Look for links with class "product-item-link"
+        product_links = soup.find_all('a', class_='product-item-link')
+        
+        for link in product_links:
+            href = link.get('href')
+            if href:
+                # Check if it's a product page (starts with /shop/p/)
+                if 'shop/p/' in href:
+                    product_urls.append(href)
+        """
+        # Also look for any links that contain the product pattern
+        all_links = soup.find_all('a', href=True)
+        for link in all_links:
+            href = link.get('href')
+            if href and ('/shop/p/' in href or href.startswith('/shop/p/')):
+                full_url = urljoin(base_url, href)
+                if full_url not in product_urls:
+                    product_urls.append(full_url)
+        """
+        return product_urls
 
     # Finds individual product pages for camera lenses
     def find_lens_pages(self, search_terms=['EF', 'RF', 'lens', 'EF-S'], max_load_more=5):
@@ -145,31 +185,6 @@ class CanonDataScraper:
         
         return product_urls
 
-    def _extract_product_links(self, soup, base_url):
-        """Extract product URLs from the page HTML"""
-        product_urls = []
-        
-        # Look for links with class "product-item-link" (as you specified)
-        product_links = soup.find_all('a', class_='product-item-link')
-        
-        for link in product_links:
-            href = link.get('href')
-            if href:
-                # Check if it's a product page (starts with /shop/p/)
-                if href.startswith('/shop/p/') or 'shop/p/' in href:
-                    full_url = urljoin(base_url, href)
-                    product_urls.append(full_url)
-        
-        # Also look for any links that contain the product pattern
-        all_links = soup.find_all('a', href=True)
-        for link in all_links:
-            href = link.get('href')
-            if href and ('/shop/p/' in href or href.startswith('/shop/p/')):
-                full_url = urljoin(base_url, href)
-                if full_url not in product_urls:
-                    product_urls.append(full_url)
-        
-        return product_urls
 
     def _find_load_more_button(self, soup):
         """Find 'Load More' button in the page"""
@@ -228,7 +243,7 @@ class CanonDataScraper:
             return []
     
     def scrape_website_specs(self, url):
-        """Scrape camera specifications from Canon website"""
+        """Scrape camera specifications from Canon website, need to fix for individual product page types (i.e. camera bodies, lenses, etc.)"""
         try:
             response = self.session.get(url)
             response.raise_for_status()
@@ -236,7 +251,7 @@ class CanonDataScraper:
             
             # Extract basic info
             product_data = {
-                'url': url,
+                'url': '',
                 'title': '',
                 'model': '',
                 'type': '',
@@ -246,14 +261,22 @@ class CanonDataScraper:
                 'description': ''
             }
             
-            # Try to find title
-            title_selectors = ['h1', '.product-title', '.page-title', 'title']
+            # Finding the url of the product
+            url_selectors = ['product-item-link']
+            for selector in url_selectors:
+                url_elem = soup.select_one(selector)
+                if url_elem:
+                    product_data['url'] = url_elem.get('href')
+                    break
+
+            # Finding the title of the product
+            title_selectors = ['product-item-name']
             for selector in title_selectors:
                 title_elem = soup.select_one(selector)
                 if title_elem:
                     product_data['title'] = title_elem.get_text().strip()
                     break
-            
+
             # Look for specifications tables/sections
             spec_sections = soup.find_all(['table', 'div'], class_=re.compile(r'spec|specification|feature|detail', re.I))
             
@@ -267,7 +290,7 @@ class CanonDataScraper:
                         value = cells[1].get_text().strip()
                         if key and value:
                             product_data['specifications'][key] = value
-                
+            
                 # Extract list data
                 items = section.find_all('li')
                 for item in items:
@@ -299,7 +322,7 @@ class CanonDataScraper:
                 if desc_elem and len(desc_elem.get_text().strip()) > 50:
                     product_data['description'] = desc_elem.get_text().strip()[:500]
                     break
-            
+
             return product_data
             
         except Exception as e:
@@ -310,7 +333,7 @@ class CanonDataScraper:
 if __name__ == "__main__":
     scraper = CanonDataScraper()  # This calls __init__ automatically
     # Scrape up to 10 "Load More" clicks
-    camera_urls = scraper.find_body_pages(max_load_more=10)
+    camera_urls = scraper.find_body_pages()
     print(f"Found {len(camera_urls)} camera URLs")
     results = []
     for url in camera_urls:

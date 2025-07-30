@@ -74,7 +74,7 @@ class CanonDataScraper:
             self.playwright.stop()
 
     def find_body_pages(self):
-        """Finds individual product pages for camera bodies using Playwright"""
+        """Finds individual product pages for camera bodies using Playwright with Load More functionality"""
         camera_urls = []
         
         try:
@@ -93,22 +93,8 @@ class CanonDataScraper:
                 try:
                     print(f"Scraping from: {target_url}")
                     
-                    # Navigate to the page
-                    self.page.goto(target_url, wait_until='domcontentloaded', timeout=30000)  # Reduced timeout
-                    
-                    # Wait for content to load
-                    time.sleep(3)
-                    
-                    # Get page content after JavaScript loads
-                    page_content = self.page.content()
-                    soup = BeautifulSoup(page_content, 'html.parser')
-                    
-                    # Debug: Print page title and some content
-                    print(f"  Page title: {soup.title.string if soup.title else 'No title'}")
-                    print(f"  Total links found: {len(soup.find_all('a'))}")
-                    
-                    # Extract product links
-                    new_urls = self._extract_product_links(soup, target_url)
+                    # Use the new _scrape_with_load_more method that handles pagination
+                    new_urls = self._scrape_with_load_more(target_url, max_load_more=3)
                     camera_urls.extend(new_urls)
                     
                     print(f"  Found {len(new_urls)} products on {target_url}")
@@ -116,10 +102,6 @@ class CanonDataScraper:
                     # Debug: Print first few links found
                     if new_urls:
                         print(f"  Sample URLs: {new_urls[:3]}")
-                    else:
-                        # Look for any links to understand the structure
-                        all_links = soup.find_all('a', href=True)
-                        print(f"  Sample links found: {[link.get('href') for link in all_links[:5]]}")
                         
                     if camera_urls:  # If we found URLs, we can stop
                         break
@@ -128,7 +110,11 @@ class CanonDataScraper:
                     print(f"Error accessing {target_url}: {e}")
                     continue
             
-            return list(set(camera_urls))[0:20]  # Return up to 20 unique URLs
+            unique_urls = list(set(camera_urls))
+            print(f"\n📊 Pagination Summary:")
+            print(f"  Total unique products found: {len(unique_urls)}")
+            print(f"  Returning first 50 products for HTML saving")
+            return unique_urls[0:50]  # Return up to 50 unique URLs
             
         except Exception as e:
             print(f"Error in find_body_pages: {e}")
@@ -301,7 +287,11 @@ class CanonDataScraper:
                 print(f"Error accessing {target_url}: {e}")
                 continue
         
-        return list(set(lens_urls))[0:20]  # Return up to 20 unique URLs
+        unique_urls = list(set(lens_urls))
+        print(f"\n📊 Lens Pagination Summary:")
+        print(f"  Total unique lens products found: {len(unique_urls)}")
+        print(f"  Returning first 50 lens products for HTML saving")
+        return unique_urls[0:50]  # Return up to 50 unique URLs
 
     # Finds individual product pages for camera accessories
     def find_accessory_pages(self, search_terms=['accessory', 'accessories', 'accessory kit', 'accessory set'], max_load_more=5):
@@ -332,53 +322,161 @@ class CanonDataScraper:
                 print(f"Error accessing {target_url}: {e}")
                 continue
         
-        return list(set(accessory_urls))[0:20]  # Return up to 20 unique URLs
+        unique_urls = list(set(accessory_urls))
+        print(f"\n📊 Accessory Pagination Summary:")
+        print(f"  Total unique accessory products found: {len(unique_urls)}")
+        print(f"  Returning first 50 accessory products for HTML saving")
+        return unique_urls[0:50]  # Return up to 50 unique URLs
 
-    def _scrape_with_load_more(self, url, max_load_more=5):
-        """Scrape product URLs from a page with 'Load More' functionality"""
+    def _scrape_with_load_more(self, url, max_load_more=10):
+        """Scrape product URLs from a page with comprehensive pagination checking"""
         product_urls = []
         
         try:
-            # Get the initial page
-            response = self.session.get(url)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.content, 'html.parser')
+            # Start browser if not already started
+            if not self.page:
+                self.start_browser()
+            
+            print(f"Navigating to: {url}")
+            self.page.goto(url, wait_until='domcontentloaded', timeout=30000)
+            time.sleep(3)  # Wait for content to load
+            
+            # Get initial page content
+            page_content = self.page.content()
+            soup = BeautifulSoup(page_content, 'html.parser')
             
             # Extract product links from initial page
-            product_urls.extend(self._extract_product_links(soup, url))
-            print(f"  Found {len(product_urls)} products on initial page")
+            initial_products = self._extract_product_links(soup, url)
+            product_urls.extend(initial_products)
+            print(f"  Found {len(initial_products)} products on initial page")
             
-            # Look for and handle "Load More" button
-            load_more_count = 0
-            while load_more_count < max_load_more:
-                # Find "Load More" button
-                load_more_button = self._find_load_more_button(soup)
-                
-                if not load_more_button:
-                    print(f"  No more 'Load More' button found after {load_more_count} clicks")
-                    break
-                
-                # Click "Load More" (simulate AJAX request)
-                new_products = self._handle_load_more(url, load_more_count + 1)
-                if new_products:
-                    product_urls.extend(new_products)
-                    print(f"  Loaded {len(new_products)} more products (total: {len(product_urls)})")
-                    load_more_count += 1
-                    time.sleep(2)  # Be respectful
-                else:
-                    print(f"  No more products loaded after {load_more_count} clicks")
-                    break
+            # Track pagination progress
+            current_page = 1
+            total_pages_found = 0
+            
+            # First, try URL-based pagination (more reliable)
+            print(f"  Checking URL-based pagination...")
+            url_pagination_products = self._scrape_url_pagination(url, max_load_more)
+            if url_pagination_products:
+                product_urls.extend(url_pagination_products)
+                print(f"  Found {len(url_pagination_products)} additional products via URL pagination")
+            
+            # Then try button-based pagination as backup
+            print(f"  Checking button-based pagination...")
+            button_pagination_products = self._scrape_button_pagination(url, max_load_more)
+            if button_pagination_products:
+                # Only add products not already found
+                new_products = [p for p in button_pagination_products if p not in product_urls]
+                product_urls.extend(new_products)
+                print(f"  Found {len(new_products)} additional products via button pagination")
+            
+            print(f"  Total unique products found: {len(product_urls)}")
             
         except Exception as e:
             print(f"Error in _scrape_with_load_more: {e}")
         
         return product_urls
 
+    def _scrape_url_pagination(self, base_url, max_pages=10):
+        """Scrape products using URL-based pagination (?p=2, ?p=3, etc.)"""
+        all_products = []
+        
+        try:
+            for page_num in range(2, max_pages + 2):  # Start from page 2 (page 1 is base_url)
+                page_url = f"{base_url}?p={page_num}"
+                print(f"    Checking page {page_num}: {page_url}")
+                
+                try:
+                    self.page.goto(page_url, wait_until='domcontentloaded', timeout=20000)
+                    time.sleep(2)
+                    
+                    page_content = self.page.content()
+                    soup = BeautifulSoup(page_content, 'html.parser')
+                    
+                    # Check if page has products (not a 404 or empty page)
+                    products_on_page = self._extract_product_links(soup, page_url)
+                    
+                    if products_on_page:
+                        all_products.extend(products_on_page)
+                        print(f"      Found {len(products_on_page)} products on page {page_num}")
+                    else:
+                        print(f"      No products found on page {page_num} - stopping pagination")
+                        break
+                        
+                except Exception as e:
+                    print(f"      Error accessing page {page_num}: {e}")
+                    break
+                    
+        except Exception as e:
+            print(f"Error in _scrape_url_pagination: {e}")
+        
+        return all_products
+
+    def _scrape_button_pagination(self, url, max_clicks=5):
+        """Scrape products using button-based pagination (Load More button)"""
+        all_products = []
+        
+        try:
+            # Navigate to the base URL
+            self.page.goto(url, wait_until='domcontentloaded', timeout=30000)
+            time.sleep(3)
+            
+            # Get initial page content
+            page_content = self.page.content()
+            soup = BeautifulSoup(page_content, 'html.parser')
+            
+            # Extract initial products
+            initial_products = self._extract_product_links(soup, url)
+            all_products.extend(initial_products)
+            
+            # Look for and handle "Load More" button
+            load_more_count = 0
+            while load_more_count < max_clicks:
+                # Find "Load More" button using Playwright
+                load_more_button = self._find_load_more_button_playwright()
+                
+                if not load_more_button:
+                    print(f"    No more 'Load More' button found after {load_more_count} clicks")
+                    break
+                
+                # Click "Load More" button
+                print(f"    Clicking 'Load More' button (attempt {load_more_count + 1})")
+                try:
+                    load_more_button.click()
+                    time.sleep(3)  # Wait for new content to load
+                    
+                    # Get updated page content
+                    page_content = self.page.content()
+                    soup = BeautifulSoup(page_content, 'html.parser')
+                    
+                    # Extract new product links
+                    all_current_products = self._extract_product_links(soup, url)
+                    new_products = [p for p in all_current_products if p not in all_products]
+                    
+                    if new_products:
+                        all_products.extend(new_products)
+                        print(f"      Loaded {len(new_products)} more products (total: {len(all_products)})")
+                        load_more_count += 1
+                        time.sleep(2)  # Be respectful
+                    else:
+                        print(f"      No new products loaded after click")
+                        break
+                        
+                except Exception as e:
+                    print(f"      Error clicking 'Load More' button: {e}")
+                    break
+                    
+        except Exception as e:
+            print(f"Error in _scrape_button_pagination: {e}")
+        
+        return all_products
+
 
     def _find_load_more_button(self, soup):
         """Find 'Load More' button in the page"""
-        # Common selectors for "Load More" buttons
+        # Canon-specific selectors for "Load More" buttons
         load_more_selectors = [
+            'button[class*="amscroll-load-button"]',  # Canon's specific class
             'button[class*="load-more"]',
             'button[class*="loadmore"]',
             'a[class*="load-more"]',
@@ -387,7 +485,8 @@ class CanonDataScraper:
             'a:contains("Load More")',
             '[data-action="load-more"]',
             '[id*="load-more"]',
-            '[class*="load-more"]'
+            '[class*="load-more"]',
+            '[class*="amscroll"]'  # Any amscroll-related elements
         ]
         
         for selector in load_more_selectors:
@@ -402,6 +501,46 @@ class CanonDataScraper:
                 return button
         
         return None
+
+    def _find_load_more_button_playwright(self):
+        """Find 'Load More' button using Playwright"""
+        try:
+            # Canon-specific selectors for "Load More" buttons
+            load_more_selectors = [
+                'button[class*="amscroll-load-button"]',  # Canon's specific class
+                'button[class*="load-more"]',
+                'button[class*="loadmore"]',
+                'button:has-text("Load more")',
+                'button:has-text("Load More")',
+                '[class*="amscroll"]:has-text("Load more")',
+                '[class*="amscroll"]:has-text("Load More")'
+            ]
+            
+            for selector in load_more_selectors:
+                try:
+                    button = self.page.query_selector(selector)
+                    if button:
+                        # Check if button is visible and clickable
+                        if button.is_visible() and button.is_enabled():
+                            return button
+                except:
+                    continue
+            
+            # Also look for buttons with "Load More" text using text content
+            buttons = self.page.query_selector_all('button')
+            for button in buttons:
+                try:
+                    text = button.text_content().lower()
+                    if 'load more' in text and button.is_visible() and button.is_enabled():
+                        return button
+                except:
+                    continue
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error finding load more button: {e}")
+            return None
 
     def _handle_load_more(self, base_url, page_number):
         """Handle the AJAX request for loading more products"""

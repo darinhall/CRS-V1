@@ -175,14 +175,12 @@ class CanonDataScraper:
         
         return product_urls
 
-        def save_product_html(self, url, company="canon", category="camera_bodies", max_retries=2):
-        """Save the HTML of a product page to organized directory structure"""
+    def save_product_html(self, url, output_dir="canon_html_pages", max_retries=2):
+        """Save the HTML of a product page to a local file with retry logic"""
         for attempt in range(max_retries):
             try:
-                # Create organized output directory
-                base_dir = "/Users/darinhall/Documents/CRS_Database/html_pages"
-                output_dir = f"{base_dir}/{company}/{category}"
-                Path(output_dir).mkdir(parents=True, exist_ok=True)
+                # Create output directory if it doesn't exist
+                Path(output_dir).mkdir(exist_ok=True)
                 
                 # Use Playwright to get the page
                 if not self.page:
@@ -221,15 +219,13 @@ class CanonDataScraper:
                     print(f"  🔄 Retrying...")
                     time.sleep(2)  # Wait before retry
                 else:
-                    print(f"  ❌ Failed after {max_retries} attempts")
+                    print(f"  �� Failed after {max_retries} attempts")
                     return None
         
         return None
-        
-        return None
 
-        def save_all_product_html(self, urls, company="canon", category="camera_bodies"):
-        """Save HTML for all product URLs with organized directory structure"""
+    def save_all_product_html(self, urls, output_dir="canon_html_pages"):
+        """Save HTML for all product URLs with better tracking"""
         saved_files = []
         failed_urls = []
         
@@ -238,9 +234,8 @@ class CanonDataScraper:
             self.start_browser()
             
             for i, url in enumerate(urls, 1):
-                print(f"
-Processing {i}/{len(urls)}: {url}")
-                saved_file = self.save_product_html(url, company, category)
+                print(f"\nProcessing {i}/{len(urls)}: {url}")
+                saved_file = self.save_product_html(url, output_dir)
                 if saved_file:
                     saved_files.append(saved_file)
                 else:
@@ -249,15 +244,13 @@ Processing {i}/{len(urls)}: {url}")
                 # Add delay between requests
                 time.sleep(1)
             
-            print(f"
-📊 Summary:")
+            print(f"\n�� Summary:")
             print(f"  ✅ Successfully saved: {len(saved_files)} files")
             print(f"  ❌ Failed to save: {len(failed_urls)} files")
-            print(f"  📁 Location: /Users/darinhall/Documents/CRS_Database/html_pages/{company}/{category}/")
+            print(f"  📁 Location: {output_dir}/")
             
             if failed_urls:
-                print(f"
-❌ Failed URLs:")
+                print(f"\n❌ Failed URLs:")
                 for url in failed_urls:
                     print(f"  - {url}")
             
@@ -269,71 +262,6 @@ Processing {i}/{len(urls)}: {url}")
         finally:
             self.stop_browser()
 
-    # Finds individual product pages for camera lenses
-    def find_lens_pages(self, search_terms=['EF', 'RF', 'lens', 'EF-S'], max_load_more=5):
-        """Find lens-related pages by handling 'Load More' buttons and specific product links"""
-        lens_urls = []
-        
-        # Target specific Canon product pages
-        target_urls = [
-            "https://www.usa.canon.com/shop/lenses/ef-lenses",
-            "https://www.usa.canon.com/shop/lenses/rf-lenses",
-            "https://www.usa.canon.com/shop/lenses/ef-s-lenses",
-            "https://www.usa.canon.com/shop/lenses/lenses"
-        ]
-        
-        for target_url in target_urls:
-            try:
-                print(f"Scraping from: {target_url}")
-                lens_urls.extend(self._scrape_with_load_more(target_url, max_load_more))
-                
-                if lens_urls:  # If we found URLs, we can stop
-                    break
-
-            except Exception as e:
-                print(f"Error accessing {target_url}: {e}")
-                continue
-        
-        unique_urls = list(set(lens_urls))
-        print(f"\n📊 Lens Pagination Summary:")
-        print(f"  Total unique lens products found: {len(unique_urls)}")
-        print(f"  Returning first 50 lens products for HTML saving")
-        return unique_urls[0:50]  # Return up to 50 unique URLs
-
-    # Finds individual product pages for camera accessories
-    def find_accessory_pages(self, search_terms=['accessory', 'accessories', 'accessory kit', 'accessory set'], max_load_more=5):
-        """Find accessory-related pages by handling 'Load More' buttons and specific product links"""
-        accessory_urls = []
-        
-        # Target specific Canon product pages
-        target_urls = [
-            "https://www.usa.canon.com/shop/accessories/accessories",
-            "https://www.usa.canon.com/shop/accessories/accessory-kits",
-            "https://www.usa.canon.com/shop/accessories/accessory-sets",
-            "https://www.usa.canon.com/shop/accessories/lenses",
-            "https://www.usa.canon.com/shop/accessories/lenses/ef-lenses",
-            "https://www.usa.canon.com/shop/accessories/lenses/rf-lenses",
-            "https://www.usa.canon.com/shop/accessories/lenses/ef-s-lenses",
-            "https://www.usa.canon.com/shop/accessories/lenses/lenses"
-        ]
-        
-        for target_url in target_urls:
-            try:
-                print(f"Scraping from: {target_url}")
-                accessory_urls.extend(self._scrape_with_load_more(target_url, max_load_more))
-                
-                if accessory_urls:  # If we found URLs, we can stop
-                    break
-                
-            except Exception as e:
-                print(f"Error accessing {target_url}: {e}")
-                continue
-        
-        unique_urls = list(set(accessory_urls))
-        print(f"\n📊 Accessory Pagination Summary:")
-        print(f"  Total unique accessory products found: {len(unique_urls)}")
-        print(f"  Returning first 50 accessory products for HTML saving")
-        return unique_urls[0:50]  # Return up to 50 unique URLs
 
     def _scrape_with_load_more(self, url, max_load_more=10):
         """Scrape product URLs from a page with comprehensive pagination checking"""
@@ -549,34 +477,103 @@ Processing {i}/{len(urls)}: {url}")
             print(f"Error finding load more button: {e}")
             return None
 
-    def _handle_load_more(self, base_url, page_number):
-        """Handle the AJAX request for loading more products"""
+
+    def test_canon_access(self):
+        """Test if we can access Canon's main site"""
         try:
-            # Common patterns for "Load More" AJAX endpoints
-            ajax_patterns = [
-                f"{base_url}?page={page_number}",
-                f"{base_url}?p={page_number}",
-                f"{base_url}?offset={page_number * 12}",  # Common offset pattern
-                f"{base_url}?limit={page_number * 12}",
-            ]
+            # Start browser
+            self.start_browser()
             
-            for ajax_url in ajax_patterns:
-                try:
-                    response = self.session.get(ajax_url)
-                    if response.status_code == 200:
-                        soup = BeautifulSoup(response.content, 'html.parser')
-                        new_products = self._extract_product_links(soup, base_url)
-                        if new_products:
-                            return new_products
-                except:
-                    continue
+            # Try the main Canon site first
+            print("Testing access to main Canon site...")
+            self.page.goto("https://www.usa.canon.com", wait_until='domcontentloaded', timeout=30000)  # Reduced timeout
+            time.sleep(3)
             
-            return []
+            page_content = self.page.content()
+            soup = BeautifulSoup(page_content, 'html.parser')
+            
+            print(f"Page title: {soup.title.string if soup.title else 'No title'}")
+            print(f"Total links: {len(soup.find_all('a'))}")
+            
+            # Look for any shop links
+            shop_links = soup.find_all('a', href=True)
+            shop_urls = [link.get('href') for link in shop_links if 'shop' in link.get('href', '').lower()]
+            print(f"Shop links found: {shop_urls[:5]}")
+            
+            return len(shop_urls) > 0
             
         except Exception as e:
-            print(f"Error handling load more: {e}")
-            return []
-    
+            print(f"Error testing Canon access: {e}")
+            return False
+        
+
+
+    # Finds individual product pages for camera lenses
+    def find_lens_pages(self, search_terms=['EF', 'RF', 'lens', 'EF-S'], max_load_more=5):
+        """Find lens-related pages by handling 'Load More' buttons and specific product links"""
+        lens_urls = []
+        
+        # Target specific Canon product pages
+        target_urls = [
+            "https://www.usa.canon.com/shop/lenses/ef-lenses",
+            "https://www.usa.canon.com/shop/lenses/rf-lenses",
+            "https://www.usa.canon.com/shop/lenses/ef-s-lenses",
+            "https://www.usa.canon.com/shop/lenses/lenses"
+        ]
+        
+        for target_url in target_urls:
+            try:
+                print(f"Scraping from: {target_url}")
+                lens_urls.extend(self._scrape_with_load_more(target_url, max_load_more))
+                
+                if lens_urls:  # If we found URLs, we can stop
+                    break
+
+            except Exception as e:
+                print(f"Error accessing {target_url}: {e}")
+                continue
+        
+        unique_urls = list(set(lens_urls))
+        print(f"\n📊 Lens Pagination Summary:")
+        print(f"  Total unique lens products found: {len(unique_urls)}")
+        print(f"  Returning first 50 lens products for HTML saving")
+        return unique_urls[0:50]  # Return up to 50 unique URLs
+
+    # Finds individual product pages for camera accessories
+    def find_accessory_pages(self, search_terms=['accessory', 'accessories', 'accessory kit', 'accessory set'], max_load_more=5):
+        """Find accessory-related pages by handling 'Load More' buttons and specific product links"""
+        accessory_urls = []
+        
+        # Target specific Canon product pages
+        target_urls = [
+            "https://www.usa.canon.com/shop/accessories/accessories",
+            "https://www.usa.canon.com/shop/accessories/accessory-kits",
+            "https://www.usa.canon.com/shop/accessories/accessory-sets",
+            "https://www.usa.canon.com/shop/accessories/lenses",
+            "https://www.usa.canon.com/shop/accessories/lenses/ef-lenses",
+            "https://www.usa.canon.com/shop/accessories/lenses/rf-lenses",
+            "https://www.usa.canon.com/shop/accessories/lenses/ef-s-lenses",
+            "https://www.usa.canon.com/shop/accessories/lenses/lenses"
+        ]
+        
+        for target_url in target_urls:
+            try:
+                print(f"Scraping from: {target_url}")
+                accessory_urls.extend(self._scrape_with_load_more(target_url, max_load_more))
+                
+                if accessory_urls:  # If we found URLs, we can stop
+                    break
+                
+            except Exception as e:
+                print(f"Error accessing {target_url}: {e}")
+                continue
+        
+        unique_urls = list(set(accessory_urls))
+        print(f"\n📊 Accessory Pagination Summary:")
+        print(f"  Total unique accessory products found: {len(unique_urls)}")
+        print(f"  Returning first 50 accessory products for HTML saving")
+        return unique_urls[0:50]  # Return up to 50 unique URLs
+
     def scrape_website_specs(self, url):
         """Scrape camera specifications from Canon website using Playwright"""
         try:
@@ -662,35 +659,7 @@ Processing {i}/{len(urls)}: {url}")
         except Exception as e:
             print(f"Error scraping {url}: {e}")
             return None
-    
-    def test_canon_access(self):
-        """Test if we can access Canon's main site"""
-        try:
-            # Start browser
-            self.start_browser()
-            
-            # Try the main Canon site first
-            print("Testing access to main Canon site...")
-            self.page.goto("https://www.usa.canon.com", wait_until='domcontentloaded', timeout=30000)  # Reduced timeout
-            time.sleep(3)
-            
-            page_content = self.page.content()
-            soup = BeautifulSoup(page_content, 'html.parser')
-            
-            print(f"Page title: {soup.title.string if soup.title else 'No title'}")
-            print(f"Total links: {len(soup.find_all('a'))}")
-            
-            # Look for any shop links
-            shop_links = soup.find_all('a', href=True)
-            shop_urls = [link.get('href') for link in shop_links if 'shop' in link.get('href', '').lower()]
-            print(f"Shop links found: {shop_urls[:5]}")
-            
-            return len(shop_urls) > 0
-            
-        except Exception as e:
-            print(f"Error testing Canon access: {e}")
-            return False
-        # Don't stop browser here - let the main flow manage it
+
 
 # Usage example
 if __name__ == "__main__":
@@ -708,7 +677,7 @@ if __name__ == "__main__":
             
             if camera_urls:
                 print("\n=== Saving HTML Files ===")
-                saved_files = scraper.save_all_product_html(camera_urls, company="canon", category="camera_bodies")
+                saved_files = scraper.save_all_product_html(camera_urls)
                 
                 print(f"\n📁 HTML files saved to: canon_html_pages/")
                 print(f"📊 Total files saved: {len(saved_files)}")

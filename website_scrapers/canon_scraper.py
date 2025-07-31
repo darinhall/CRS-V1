@@ -8,11 +8,10 @@ import re
 from pathlib import Path
 import xml.etree.ElementTree as ET
 from playwright.sync_api import sync_playwright
+from datetime import datetime
 
 
-'''
-This is a scraper for the Canon website. It is used to scrape the main canon shop page to find all the items on Canon's website currently for sale.
-'''
+'''This is a scraper for the Canon website. It is used to scrape the main canon shop page to find all the items on Canon's website currently for sale.'''
 
 class CanonDataScraper:
     def __init__(self):
@@ -94,7 +93,7 @@ class CanonDataScraper:
                     print(f"Scraping from: {target_url}")
                     
                     # Use the new _scrape_with_load_more method that handles pagination
-                    new_urls = self._scrape_with_load_more(target_url, max_load_more=3)
+                    new_urls = self._scrape_with_load_more(target_url, max_load_more=30)  # Increased from 3 to 30
                     camera_urls.extend(new_urls)
                     
                     print(f"  Found {len(new_urls)} products on {target_url}")
@@ -113,8 +112,8 @@ class CanonDataScraper:
             unique_urls = list(set(camera_urls))
             print(f"\n📊 Pagination Summary:")
             print(f"  Total unique products found: {len(unique_urls)}")
-            print(f"  Returning first 50 products for HTML saving")
-            return unique_urls[0:50]  # Return up to 50 unique URLs
+            print(f"  Returning all products for HTML saving")
+            return unique_urls  # Return all unique URLs
             
         except Exception as e:
             print(f"Error in find_body_pages: {e}")
@@ -124,8 +123,13 @@ class CanonDataScraper:
         """Extract product URLs from page HTML"""
         product_urls = []
         
+        # Debug counter
+        total_links_checked = 0
+        product_links_found = 0
+        
         # Look for links with class "product-item-link"
         product_links = soup.find_all('a', class_='product-item-link')
+        total_links_checked += len(product_links)
         
         for link in product_links:
             href = link.get('href')
@@ -138,9 +142,12 @@ class CanonDataScraper:
                 # Only include actual product pages (not filter pages) and exclude refurbished
                 if '/shop/p/' in full_url and '?' not in full_url and 'refurbished' not in full_url.lower():
                     product_urls.append(full_url)
+                    product_links_found += 1
         
         # Also look for any links that contain the product pattern
         all_links = soup.find_all('a', href=True)
+        total_links_checked += len(all_links)
+        
         for link in all_links:
             href = link.get('href')
             if href and ('/shop/p/' in href or href.startswith('/shop/p/')):
@@ -152,6 +159,7 @@ class CanonDataScraper:
                 # Only include actual product pages (not filter pages) and exclude refurbished
                 if '/shop/p/' in full_url and '?' not in full_url and 'refurbished' not in full_url.lower() and full_url not in product_urls:
                     product_urls.append(full_url)
+                    product_links_found += 1
         
         # Look for product links in different formats
         product_selectors = [
@@ -162,6 +170,8 @@ class CanonDataScraper:
         
         for selector in product_selectors:
             links = soup.select(selector)
+            total_links_checked += len(links)
+            
             for link in links:
                 href = link.get('href')
                 if href:
@@ -172,14 +182,20 @@ class CanonDataScraper:
                     # Only include actual product pages (not filter pages) and exclude refurbished
                     if '/shop/p/' in full_url and '?' not in full_url and 'refurbished' not in full_url.lower() and full_url not in product_urls:
                         product_urls.append(full_url)
+                        product_links_found += 1
+        
+        # Debug output
+        print(f"    🔍 Extracted {product_links_found} product links from {total_links_checked} total links checked")
         
         return product_urls
 
-    def save_product_html(self, url, output_dir="canon_html_pages", max_retries=2):
-        """Save the HTML of a product page to a local file with retry logic"""
+    def save_product_html(self, url, company="canon", category="body", max_retries=3):
+        """Save the HTML of a product page to a local file with retry logic and bot detection avoidance"""
         for attempt in range(max_retries):
             try:
                 # Create output directory if it doesn't exist
+                base_dir = "/Users/darinhall/Documents/CRS_Database/company_product"
+                output_dir = f"{base_dir}/{company}/raw_html"
                 Path(output_dir).mkdir(exist_ok=True)
                 
                 # Use Playwright to get the page
@@ -188,25 +204,42 @@ class CanonDataScraper:
                 
                 print(f"Saving HTML from: {url} (attempt {attempt + 1}/{max_retries})")
                 
-                # Increase timeout for slower pages
-                timeout = 25000 if attempt == 0 else 30000  # Longer timeout on retry
+                # Navigate to the page
+                self.page.goto(url, wait_until='domcontentloaded', timeout=30000)
+                time.sleep(2)  # Wait for content to load
                 
-                self.page.goto(url, wait_until='domcontentloaded', timeout=timeout)
-                time.sleep(3)  # Wait for content to load
-                
+                # Get the page content
                 page_content = self.page.content()
                 
-                # Create a safe filename from the URL
-                # Extract product name from URL
-                product_name = url.split('/')[-1].split('?')[0].split('#')[0]
-                if not product_name:
-                    product_name = "product"
+                # Check if the page contains "Access Denied"
+                if "Access Denied" in page_content:
+                    print(f"  ⚠️  Access denied for: {url}")
+                    return None
                 
-                # Create filename
-                filename = f"{product_name}.html"
+                # Extract filename from URL
+                filename = url.split('/')[-1].split('#')[0]  # Remove any fragment
+                if not filename.endswith('.html'):
+                    filename += '.html'
+                
                 filepath = Path(output_dir) / filename
                 
-                # Save HTML to file
+                # Check if file exists and if it contains "Access Denied"
+                should_overwrite = False
+                if filepath.exists():
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            existing_content = f.read()
+                            if "<title>Access Denied</title>" in existing_content:
+                                print(f"  🔄 File exists but contains 'Access Denied', re-scraping: {filepath}")
+                                should_overwrite = True
+                            else:
+                                print(f"  ⚠️  File already exists, skipping: {filepath}")
+                                return str(filepath)
+                    except Exception as e:
+                        print(f"  ⚠️  Error reading existing file, will overwrite: {e}")
+                        should_overwrite = True
+                
+                # Save the HTML content
                 with open(filepath, 'w', encoding='utf-8') as f:
                     f.write(page_content)
                 
@@ -214,18 +247,19 @@ class CanonDataScraper:
                 return str(filepath)
                 
             except Exception as e:
-                print(f"  ❌ Attempt {attempt + 1} failed: {e}")
+                print(f"  ❌ Error saving {url}: {e}")
                 if attempt < max_retries - 1:
-                    print(f"  🔄 Retrying...")
-                    time.sleep(2)  # Wait before retry
+                    print(f"  🔄 Retrying... ({attempt + 1}/{max_retries})")
+                    time.sleep(2 ** attempt)  # Exponential backoff
                 else:
-                    print(f"  �� Failed after {max_retries} attempts")
+                    print(f"  ❌ Failed to save {url} after {max_retries} attempts")
                     return None
         
         return None
 
-    def save_all_product_html(self, urls, output_dir="canon_html_pages"):
-        """Save HTML for all product URLs with better tracking"""
+    def save_all_product_html(self, urls, company="canon", category="body", start_from_index=0):
+        """Save HTML for all product URLs with better tracking and bot detection avoidance"""
+        base_dir = "/Users/darinhall/Documents/CRS_Database/company_product"
         saved_files = []
         failed_urls = []
         
@@ -233,22 +267,50 @@ class CanonDataScraper:
             # Start browser once for all pages
             self.start_browser()
             
-            for i, url in enumerate(urls, 1):
+            # Filter URLs to start from the specified index
+            urls_to_process = urls[start_from_index:]
+            print(f"📊 Starting from URL index {start_from_index} (processing {len(urls_to_process)} URLs)")
+            
+            for i, url in enumerate(urls_to_process, start_from_index + 1):
                 print(f"\nProcessing {i}/{len(urls)}: {url}")
-                saved_file = self.save_product_html(url, output_dir)
+                
+                # Add random delay between requests (2-5 seconds)
+                import random
+                delay = random.uniform(2, 5)
+                print(f"  ⏱️  Waiting {delay:.1f} seconds...")
+                time.sleep(delay)
+                
+                saved_file = self.save_product_html(url, company, category)
                 if saved_file:
                     saved_files.append(saved_file)
                 else:
                     failed_urls.append(url)
                 
-                # Add delay between requests
-                time.sleep(1)
+                # Add longer delay every 10 requests to avoid detection
+                if i % 10 == 0:
+                    long_delay = random.uniform(8, 12)
+                    print(f"  🛑 Taking a longer break ({long_delay:.1f}s) to avoid detection...")
+                    time.sleep(long_delay)
+                
+                # Add even longer delay every 50 requests
+                if i % 50 == 0:
+                    very_long_delay = random.uniform(15, 25)
+                    print(f"  🛑 Taking a much longer break ({very_long_delay:.1f}s) to avoid detection...")
+                    time.sleep(very_long_delay)
             
-            print(f"\n�� Summary:")
-            print(f"  ✅ Successfully saved: {len(saved_files)} files")
+            unique_files = list(set(saved_files))
+            actual_files_count = len([f for f in unique_files if f is not None])
+            
+            print(f"\n📊 Summary:")
+            print(f"  ✅ Successfully processed: {len(saved_files)} URLs")
+            print(f"  📁 Unique files saved: {actual_files_count} files")
             print(f"  ❌ Failed to save: {len(failed_urls)} files")
-            print(f"  📁 Location: {output_dir}/")
+            print(f"  📁 Location: {base_dir}/{company}/raw_html/")
             
+            # Show duplicate info if there are duplicates
+            if len(saved_files) > actual_files_count:
+                print(f"  ⚠️  Duplicates removed: {len(saved_files) - actual_files_count} files")
+
             if failed_urls:
                 print(f"\n❌ Failed URLs:")
                 for url in failed_urls:
@@ -266,13 +328,16 @@ class CanonDataScraper:
     def _scrape_with_load_more(self, url, max_load_more=10):
         """Scrape product URLs from a page with comprehensive pagination checking"""
         product_urls = []
+        initial_count = 0
+        url_pagination_count = 0
+        button_pagination_count = 0
         
         try:
             # Start browser if not already started
             if not self.page:
                 self.start_browser()
             
-            print(f"Navigating to: {url}")
+            print(f"🌐 Navigating to: {url}")
             self.page.goto(url, wait_until='domcontentloaded', timeout=30000)
             time.sleep(3)  # Wait for content to load
             
@@ -283,48 +348,65 @@ class CanonDataScraper:
             # Extract product links from initial page
             initial_products = self._extract_product_links(soup, url)
             product_urls.extend(initial_products)
-            print(f"  Found {len(initial_products)} products on initial page")
-            
-            # Track pagination progress
-            current_page = 1
-            total_pages_found = 0
+            initial_count = len(initial_products)
+            print(f"  📦 Found {initial_count} products on initial page")
             
             # First, try URL-based pagination (more reliable)
-            print(f"  Checking URL-based pagination...")
-            url_pagination_products = self._scrape_url_pagination(url, max_load_more)
+            print(f"  🔗 Checking URL-based pagination...")
+            url_pagination_products = self._scrape_url_pagination(url, max_pages=max_load_more)
             if url_pagination_products:
                 product_urls.extend(url_pagination_products)
-                print(f"  Found {len(url_pagination_products)} additional products via URL pagination")
+                url_pagination_count = len(url_pagination_products)
+                print(f"  📄 Found {url_pagination_count} additional products via URL pagination")
             
-            # Then try button-based pagination as backup
-            print(f"  Checking button-based pagination...")
-            button_pagination_products = self._scrape_button_pagination(url, max_load_more)
-            if button_pagination_products:
-                # Only add products not already found
-                new_products = [p for p in button_pagination_products if p not in product_urls]
-                product_urls.extend(new_products)
-                print(f"  Found {len(new_products)} additional products via button pagination")
+            # Only try button-based pagination if URL pagination didn't find many products
+            # This serves as a backup for sites that don't use URL pagination
+            if url_pagination_count < 10:  # If URL pagination found less than 10 products, try button pagination
+                print(f"  🔘 URL pagination found few products ({url_pagination_count}), trying button pagination as backup...")
+                button_pagination_products = self._scrape_button_pagination(url, max_load_more)
+                if button_pagination_products:
+                    # Only add products not already found
+                    new_products = [p for p in button_pagination_products if p not in product_urls]
+                    product_urls.extend(new_products)
+                    button_pagination_count = len(new_products)
+                    print(f"  🔘 Found {button_pagination_count} additional products via button pagination")
+            else:
+                print(f"  🔘 Skipping button pagination - URL pagination found sufficient products ({url_pagination_count})")
             
-            print(f"  Total unique products found: {len(product_urls)}")
+            # Final summary
+            print(f"  📊 Final Summary:")
+            print(f"    Initial page: {initial_count} products")
+            print(f"    URL pagination: {url_pagination_count} products")
+            print(f"    Button pagination: {button_pagination_count} products")
+            print(f"    Total unique products found: {len(product_urls)}")
             
         except Exception as e:
             print(f"Error in _scrape_with_load_more: {e}")
         
         return product_urls
 
-    def _scrape_url_pagination(self, base_url, max_pages=10):
+    def _scrape_url_pagination(self, base_url, max_pages=30):
         """Scrape products using URL-based pagination (?p=2, ?p=3, etc.)"""
         all_products = []
+        pages_checked = 0
+        pages_with_products = 0
+        consecutive_empty_pages = 0
         
         try:
+            print(f"    📄 Starting URL pagination (max_pages={max_pages})")
+            
             for page_num in range(2, max_pages + 2):  # Start from page 2 (page 1 is base_url)
                 page_url = f"{base_url}?p={page_num}"
-                print(f"    Checking page {page_num}: {page_url}")
+                pages_checked += 1
+                
+                print(f"    📄 Checking page {page_num}: {page_url}")
                 
                 try:
+                    # Navigate to the page
                     self.page.goto(page_url, wait_until='domcontentloaded', timeout=20000)
                     time.sleep(2)
                     
+                    # Get page content
                     page_content = self.page.content()
                     soup = BeautifulSoup(page_content, 'html.parser')
                     
@@ -333,14 +415,33 @@ class CanonDataScraper:
                     
                     if products_on_page:
                         all_products.extend(products_on_page)
-                        print(f"      Found {len(products_on_page)} products on page {page_num}")
+                        pages_with_products += 1
+                        consecutive_empty_pages = 0  # Reset counter
+                        print(f"      ✅ Found {len(products_on_page)} products on page {page_num} (total: {len(all_products)})")
                     else:
-                        print(f"      No products found on page {page_num} - stopping pagination")
-                        break
+                        consecutive_empty_pages += 1
+                        print(f"      ⚠️  No products found on page {page_num} (consecutive empty: {consecutive_empty_pages})")
+                        
+                        # Stop if we've had 3 consecutive empty pages
+                        if consecutive_empty_pages >= 3:
+                            print(f"      🛑 Stopping pagination after {consecutive_empty_pages} consecutive empty pages")
+                            break
                         
                 except Exception as e:
-                    print(f"      Error accessing page {page_num}: {e}")
-                    break
+                    consecutive_empty_pages += 1
+                    print(f"      ❌ Error accessing page {page_num}: {e}")
+                    
+                    # Stop if we've had 3 consecutive errors
+                    if consecutive_empty_pages >= 3:
+                        print(f"      🛑 Stopping pagination after {consecutive_empty_pages} consecutive errors")
+                        break
+                    
+                    continue
+            
+            print(f"    📊 URL Pagination Summary:")
+            print(f"      Pages checked: {pages_checked}")
+            print(f"      Pages with products: {pages_with_products}")
+            print(f"      Total products found: {len(all_products)}")
                     
         except Exception as e:
             print(f"Error in _scrape_url_pagination: {e}")
@@ -350,6 +451,8 @@ class CanonDataScraper:
     def _scrape_button_pagination(self, url, max_clicks=5):
         """Scrape products using button-based pagination (Load More button)"""
         all_products = []
+        initial_count = 0
+        new_products_per_click = []
         
         try:
             # Navigate to the base URL
@@ -363,6 +466,8 @@ class CanonDataScraper:
             # Extract initial products
             initial_products = self._extract_product_links(soup, url)
             all_products.extend(initial_products)
+            initial_count = len(initial_products)
+            print(f"    📦 Initial page: {initial_count} products")
             
             # Look for and handle "Load More" button
             load_more_count = 0
@@ -371,11 +476,11 @@ class CanonDataScraper:
                 load_more_button = self._find_load_more_button_playwright()
                 
                 if not load_more_button:
-                    print(f"    No more 'Load More' button found after {load_more_count} clicks")
+                    print(f"    🔍 No more 'Load More' button found after {load_more_count} clicks")
                     break
                 
                 # Click "Load More" button
-                print(f"    Clicking 'Load More' button (attempt {load_more_count + 1})")
+                print(f"    🔘 Clicking 'Load More' button (attempt {load_more_count + 1}/{max_clicks})")
                 try:
                     load_more_button.click()
                     time.sleep(3)  # Wait for new content to load
@@ -390,52 +495,29 @@ class CanonDataScraper:
                     
                     if new_products:
                         all_products.extend(new_products)
-                        print(f"      Loaded {len(new_products)} more products (total: {len(all_products)})")
+                        new_products_per_click.append(len(new_products))
+                        print(f"      ✅ Loaded {len(new_products)} more products (total: {len(all_products)})")
                         load_more_count += 1
                         time.sleep(2)  # Be respectful
                     else:
-                        print(f"      No new products loaded after click")
+                        print(f"      ⚠️  No new products loaded after click")
                         break
                         
                 except Exception as e:
-                    print(f"      Error clicking 'Load More' button: {e}")
+                    print(f"      ❌ Error clicking 'Load More' button: {e}")
                     break
+            
+            # Summary
+            print(f"    📊 Button Pagination Summary:")
+            print(f"      Initial products: {initial_count}")
+            print(f"      Load more clicks: {load_more_count}")
+            print(f"      New products per click: {new_products_per_click}")
+            print(f"      Total products: {len(all_products)}")
                     
         except Exception as e:
             print(f"Error in _scrape_button_pagination: {e}")
         
         return all_products
-
-
-    def _find_load_more_button(self, soup):
-        """Find 'Load More' button in the page"""
-        # Canon-specific selectors for "Load More" buttons
-        load_more_selectors = [
-            'button[class*="amscroll-load-button"]',  # Canon's specific class
-            'button[class*="load-more"]',
-            'button[class*="loadmore"]',
-            'a[class*="load-more"]',
-            'a[class*="loadmore"]',
-            'button:contains("Load More")',
-            'a:contains("Load More")',
-            '[data-action="load-more"]',
-            '[id*="load-more"]',
-            '[class*="load-more"]',
-            '[class*="amscroll"]'  # Any amscroll-related elements
-        ]
-        
-        for selector in load_more_selectors:
-            button = soup.select_one(selector)
-            if button:
-                return button
-        
-        # Also look for buttons with "Load More" text
-        buttons = soup.find_all(['button', 'a'])
-        for button in buttons:
-            if 'load more' in button.get_text().lower():
-                return button
-        
-        return None
 
     def _find_load_more_button_playwright(self):
         """Find 'Load More' button using Playwright"""
@@ -505,39 +587,56 @@ class CanonDataScraper:
         except Exception as e:
             print(f"Error testing Canon access: {e}")
             return False
-        
 
 
     # Finds individual product pages for camera lenses
-    def find_lens_pages(self, search_terms=['EF', 'RF', 'lens', 'EF-S'], max_load_more=5):
-        """Find lens-related pages by handling 'Load More' buttons and specific product links"""
+    def find_lens_pages(self):
+        """Finds individual product pages for camera lenses using Playwright with Load More functionality"""
         lens_urls = []
         
-        # Target specific Canon product pages
-        target_urls = [
-            "https://www.usa.canon.com/shop/lenses/ef-lenses",
-            "https://www.usa.canon.com/shop/lenses/rf-lenses",
-            "https://www.usa.canon.com/shop/lenses/ef-s-lenses",
-            "https://www.usa.canon.com/shop/lenses/lenses"
-        ]
-        
-        for target_url in target_urls:
-            try:
-                print(f"Scraping from: {target_url}")
-                lens_urls.extend(self._scrape_with_load_more(target_url, max_load_more))
-                
-                if lens_urls:  # If we found URLs, we can stop
-                    break
+        try:
+            # Start browser
+            self.start_browser()
+            
+            # Target specific Canon lens pages
+            target_urls = [
+                "https://www.usa.canon.com/shop/camera-lenses",
+                "https://www.usa.canon.com/shop/lenses/ef-lenses",
+                "https://www.usa.canon.com/shop/lenses/rf-lenses",
+                "https://www.usa.canon.com/shop/lenses/ef-s-lenses",
+                "https://www.usa.canon.com/shop/lenses/lenses"
+            ]
 
-            except Exception as e:
-                print(f"Error accessing {target_url}: {e}")
-                continue
-        
-        unique_urls = list(set(lens_urls))
-        print(f"\n📊 Lens Pagination Summary:")
-        print(f"  Total unique lens products found: {len(unique_urls)}")
-        print(f"  Returning first 50 lens products for HTML saving")
-        return unique_urls[0:50]  # Return up to 50 unique URLs
+            for target_url in target_urls:
+                try:
+                    print(f"Scraping from: {target_url}")
+                    
+                    # Use the new _scrape_with_load_more method that handles pagination
+                    new_urls = self._scrape_with_load_more(target_url, max_load_more=30)  # Increased from 5 to 30
+                    lens_urls.extend(new_urls)
+                    
+                    print(f"  Found {len(new_urls)} products on {target_url}")
+                    
+                    # Debug: Print first few links found
+                    if new_urls:
+                        print(f"  Sample URLs: {new_urls[:3]}")
+                        
+                    if lens_urls:  # If we found URLs, we can stop
+                        break
+                        
+                except Exception as e:
+                    print(f"Error accessing {target_url}: {e}")
+                    continue
+            
+            unique_urls = list(set(lens_urls))
+            print(f"\n📊 Lens Pagination Summary:")
+            print(f"  Total unique lens products found: {len(unique_urls)}")
+            print(f"  Returning all products for HTML saving")
+            return unique_urls  # Return all unique URLs
+            
+        except Exception as e:
+            print(f"Error in find_lens_pages: {e}")
+            return []
 
     # Finds individual product pages for camera accessories
     def find_accessory_pages(self, search_terms=['accessory', 'accessories', 'accessory kit', 'accessory set'], max_load_more=5):
@@ -660,6 +759,70 @@ class CanonDataScraper:
             print(f"Error scraping {url}: {e}")
             return None
 
+    def save_urls_to_json(self, urls, company="canon", category="body"):
+        """Save discovered URLs to a JSON file for later use"""
+        import json
+        from pathlib import Path
+        
+        # Create data directory if it doesn't exist
+        data_dir = Path("data/url_lists")
+        data_dir.mkdir(parents=True, exist_ok=True)
+        
+        filename = f"{company}_{category}_urls.json"
+        filepath = data_dir / filename
+        
+        # Save URLs with metadata
+        data = {
+            "company": company,
+            "category": category,
+            "total_urls": len(urls),
+            "discovery_date": str(datetime.now()),
+            "urls": urls
+        }
+        
+        with open(filepath, 'w') as f:
+            json.dump(data, f, indent=2)
+        
+        print(f"📄 Saved {len(urls)} URLs to: {filepath}")
+        return filepath
+    
+    def load_urls_from_json(self, company="canon", category="body"):
+        """Load URLs from JSON file"""
+        import json
+        from pathlib import Path
+        
+        filename = f"{company}_{category}_urls.json"
+        filepath = Path("data/url_lists") / filename
+        
+        if not filepath.exists():
+            print(f"❌ URL file not found: {filepath}")
+            return None
+        
+        with open(filepath, 'r') as f:
+            data = json.load(f)
+        
+        print(f"📄 Loaded {len(data['urls'])} URLs from: {filepath}")
+        return data['urls']
+    
+    def scrape_in_batches(self, urls, company="canon", category="body", batch_size=120, start_index=0):
+        """Scrape URLs in batches to avoid bot detection"""
+        total_urls = len(urls)
+        end_index = min(start_index + batch_size, total_urls)
+        
+        print(f"📊 Batch processing: URLs {start_index + 1}-{end_index} of {total_urls}")
+        print(f"📊 Processing {end_index - start_index} URLs in this batch")
+        
+        # Get the batch of URLs to process
+        batch_urls = urls[start_index:end_index]
+        
+        # Save HTML files for this batch
+        saved_files = self.save_all_product_html(batch_urls, company, category)
+        
+        print(f"✅ Batch complete: {len(saved_files)} files saved")
+        print(f"📊 Next batch would start at index: {end_index}")
+        
+        return saved_files, end_index
+
 
 # Usage example
 if __name__ == "__main__":
@@ -671,32 +834,62 @@ if __name__ == "__main__":
         if scraper.test_canon_access():
             print("✅ Can access Canon website")
             
-            print("\n=== Scraping Camera Pages ===")
-            camera_urls = scraper.find_body_pages()
-            print(f"Found {len(camera_urls)} camera URLs (excluding refurbished)")
+            # Configuration for camera bodies
+            company = "canon"
+            category = "body"
+            batch_size = 120  # Process 120 URLs at a time
+            start_index = 240  # Resume from URL 241
             
-            if camera_urls:
-                print("\n=== Saving HTML Files ===")
-                saved_files = scraper.save_all_product_html(camera_urls)
+            print(f"\n=== Camera Body Scraping Configuration ===")
+            print(f"Company: {company}")
+            print(f"Category: {category}")
+            print(f"Batch size: {batch_size}")
+            print(f"Start index: {start_index}")
+            
+            # Try to load existing URLs first
+            print(f"\n=== Loading Existing URLs ===")
+            body_urls = scraper.load_urls_from_json(company, category)
+            
+            if body_urls is None:
+                # If no existing URLs, discover them and save to JSON
+                print(f"\n=== Discovering Camera Body URLs ===")
+                body_urls = scraper.find_body_pages()
+                print(f"Found {len(body_urls)} camera body URLs")
                 
-                print(f"\n📁 HTML files saved to: canon_html_pages/")
-                print(f"📊 Total files saved: {len(saved_files)}")
+                if body_urls:
+                    print(f"\n=== Saving URLs to JSON ===")
+                    scraper.save_urls_to_json(body_urls, company, category)
+            
+            if body_urls:
+                print(f"\n=== Processing Camera Body URLs in Batches ===")
+                print(f"Total URLs available: {len(body_urls)}")
                 
-                # Optional: Show some sample filenames
-                if saved_files:
-                    print("\nSample saved files:")
-                    for file in saved_files[:5]:
-                        print(f"  - {Path(file).name}")
+                # Process in batches
+                saved_files, next_index = scraper.scrape_in_batches(
+                    body_urls, 
+                    company=company, 
+                    category=category, 
+                    batch_size=batch_size, 
+                    start_index=start_index
+                )
                 
-            else:
-                print("No camera URLs found")
+                print(f"\n📊 Batch Summary:")
+                print(f"  ✅ Files saved: {len(saved_files)}")
+                print(f"  📊 Next batch index: {next_index}")
+                print(f"  📊 Remaining URLs: {len(body_urls) - next_index}")
+                
+                if next_index < len(body_urls):
+                    print(f"\n💡 To continue, update start_index to {next_index}")
+                else:
+                    print(f"\n🎉 All URLs processed!")
+            
         else:
-            print("❌ Cannot access Canon website - they may be blocking automated access")
+            print("❌ Cannot access Canon website")
+            
     except Exception as e:
-        print(f"Error in main execution: {e}")
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        
     finally:
-        # Always stop browser at the end
-        try:
-            scraper.stop_browser()
-        except:
-            pass  # Ignore errors when stopping browser
+        scraper.stop_browser()

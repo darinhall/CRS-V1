@@ -589,7 +589,6 @@ class CanonDataScraper:
             return False
 
 
-    # Finds individual product pages for camera lenses
     def find_lens_pages(self):
         """Finds individual product pages for camera lenses using Playwright with Load More functionality"""
         lens_urls = []
@@ -638,7 +637,6 @@ class CanonDataScraper:
             print(f"Error in find_lens_pages: {e}")
             return []
 
-    # Finds individual product pages for camera accessories
     def find_accessory_pages(self, search_terms=['accessory', 'accessories', 'accessory kit', 'accessory set'], max_load_more=5):
         """Find accessory-related pages by handling 'Load More' buttons and specific product links"""
         accessory_urls = []
@@ -824,7 +822,7 @@ class CanonDataScraper:
         return saved_files, end_index
 
 
-# Usage example
+
 if __name__ == "__main__":
     scraper = CanonDataScraper()  # This calls __init__ automatically
     

@@ -637,39 +637,68 @@ class CanonDataScraper:
             print(f"Error in find_lens_pages: {e}")
             return []
 
-    def find_accessory_pages(self, search_terms=['accessory', 'accessories', 'accessory kit', 'accessory set'], max_load_more=5):
-        """Find accessory-related pages by handling 'Load More' buttons and specific product links"""
-        accessory_urls = []
+    def find_video_pages(self):
+        """Finds individual product pages for video cameras using Playwright with Load More functionality"""
+        video_urls = []
         
-        # Target specific Canon product pages
-        target_urls = [
-            "https://www.usa.canon.com/shop/accessories/accessories",
-            "https://www.usa.canon.com/shop/accessories/accessory-kits",
-            "https://www.usa.canon.com/shop/accessories/accessory-sets",
-            "https://www.usa.canon.com/shop/accessories/lenses",
-            "https://www.usa.canon.com/shop/accessories/lenses/ef-lenses",
-            "https://www.usa.canon.com/shop/accessories/lenses/rf-lenses",
-            "https://www.usa.canon.com/shop/accessories/lenses/ef-s-lenses",
-            "https://www.usa.canon.com/shop/accessories/lenses/lenses"
-        ]
-        
-        for target_url in target_urls:
-            try:
-                print(f"Scraping from: {target_url}")
-                accessory_urls.extend(self._scrape_with_load_more(target_url, max_load_more))
-                
-                if accessory_urls:  # If we found URLs, we can stop
-                    break
-                
-            except Exception as e:
-                print(f"Error accessing {target_url}: {e}")
-                continue
-        
-        unique_urls = list(set(accessory_urls))
-        print(f"\n📊 Accessory Pagination Summary:")
-        print(f"  Total unique accessory products found: {len(unique_urls)}")
-        print(f"  Returning first 50 accessory products for HTML saving")
-        return unique_urls[0:50]  # Return up to 50 unique URLs
+        try:
+            # Start browser
+            self.start_browser()
+            
+            # Target specific Canon video camera pages
+            target_urls = [
+                "https://www.usa.canon.com/shop/video-cameras",
+                "https://www.usa.canon.com/shop/pro/cameras/cinema-cameras"
+            ]
+
+            for target_url in target_urls:
+                try:
+                    print(f"Scraping from: {target_url}")
+                    
+                    # Use the new _scrape_with_load_more method that handles pagination
+                    new_urls = self._scrape_with_load_more(target_url, max_load_more=30)  # Increased from 3 to 30
+                    video_urls.extend(new_urls)
+                    
+                    print(f"  Found {len(new_urls)} products on {target_url}")
+                    
+                    # Debug: Print first few links found
+                    if new_urls:
+                        print(f"  Sample URLs: {new_urls[:3]}")
+                    else:
+                        print(f"  ❌ No URLs found on {target_url}")
+                        print(f"  DEBUG: Let's check if the page loads correctly...")
+                        
+                        # Try to load the page and see what we get
+                        try:
+                            self.page.goto(target_url, wait_until='networkidle')
+                            time.sleep(3)
+                            page_content = self.page.content()
+                            soup = BeautifulSoup(page_content, 'html.parser')
+                            
+                            # Look for any product links
+                            all_links = soup.find_all('a', href=True)
+                            product_links = [link for link in all_links if '/shop/p/' in link.get('href', '')]
+                            print(f"  DEBUG: Found {len(product_links)} potential product links on page")
+                            
+                            if product_links:
+                                print(f"  DEBUG: Sample product links: {[link.get('href') for link in product_links[:3]]}")
+                            
+                        except Exception as debug_e:
+                            print(f"  DEBUG: Error checking page content: {debug_e}")
+                        
+                except Exception as e:
+                    print(f"Error accessing {target_url}: {e}")
+                    continue
+            
+            unique_urls = list(set(video_urls))
+            print(f"\n📊 Video Camera Pagination Summary:")
+            print(f"  Total unique video camera products found: {len(unique_urls)}")
+            print(f"  Returning all products for HTML saving")
+            return unique_urls  # Return all unique URLs
+            
+        except Exception as e:
+            print(f"Error in find_video_pages: {e}")
+            return []
 
     def scrape_website_specs(self, url):
         """Scrape camera specifications from Canon website using Playwright"""
@@ -832,54 +861,71 @@ if __name__ == "__main__":
         if scraper.test_canon_access():
             print("✅ Can access Canon website")
             
-            # Configuration for camera bodies
-            company = "canon"
-            category = "body"
-            batch_size = 120  # Process 120 URLs at a time
-            start_index = 240  # Resume from URL 241
+
+            # Configuration for video cameras
+            video_company = "canon"
+            video_category = "video"
+            video_batch_size = 120  # Process 120 URLs at a time
+            video_start_index = 0  # Start from beginning
             
-            print(f"\n=== Camera Body Scraping Configuration ===")
-            print(f"Company: {company}")
-            print(f"Category: {category}")
-            print(f"Batch size: {batch_size}")
-            print(f"Start index: {start_index}")
+            
+            print(f"\n=== Video Camera Scraping Configuration ===")
+            print(f"Company: {video_company}")
+            print(f"Category: {video_category}")
+            print(f"Batch size: {video_batch_size}")
+            print(f"Start index: {video_start_index}")
+            
+            # Process Video Cameras
+            print(f"\n{'='*50}")
+            print(f"=== PROCESSING VIDEO CAMERAS ===")
+            print(f"{'='*50}")
             
             # Try to load existing URLs first
-            print(f"\n=== Loading Existing URLs ===")
-            body_urls = scraper.load_urls_from_json(company, category)
+            print(f"\n=== Loading Existing Video Camera URLs ===")
+            video_urls = scraper.load_urls_from_json(video_company, video_category)
+            print(f"DEBUG: video_urls type: {type(video_urls)}, value: {video_urls}")
             
-            if body_urls is None:
+            if video_urls is None:
                 # If no existing URLs, discover them and save to JSON
-                print(f"\n=== Discovering Camera Body URLs ===")
-                body_urls = scraper.find_body_pages()
-                print(f"Found {len(body_urls)} camera body URLs")
+                print(f"\n=== Discovering Video Camera URLs ===")
+                video_urls = scraper.find_video_pages()
+                print(f"DEBUG: After find_video_pages(), video_urls type: {type(video_urls)}, length: {len(video_urls) if video_urls else 'None'}")
+                print(f"Found {len(video_urls)} video camera URLs")
                 
-                if body_urls:
-                    print(f"\n=== Saving URLs to JSON ===")
-                    scraper.save_urls_to_json(body_urls, company, category)
+                if video_urls and len(video_urls) > 0:
+                    print(f"\n=== Saving Video Camera URLs to JSON ===")
+                    scraper.save_urls_to_json(video_urls, video_company, video_category)
+                else:
+                    print("❌ No video camera URLs found during discovery!")
+                    video_urls = None  # Set to None so we don't proceed with empty list
             
-            if body_urls:
-                print(f"\n=== Processing Camera Body URLs in Batches ===")
-                print(f"Total URLs available: {len(body_urls)}")
+            print(f"DEBUG: Final video_urls check - type: {type(video_urls)}, length: {len(video_urls) if video_urls else 'None'}")
+            if video_urls and len(video_urls) > 0:
+                print(f"\n=== Processing Video Camera URLs in Batches ===")
+                print(f"Total URLs available: {len(video_urls)}")
                 
                 # Process in batches
                 saved_files, next_index = scraper.scrape_in_batches(
-                    body_urls, 
-                    company=company, 
-                    category=category, 
-                    batch_size=batch_size, 
-                    start_index=start_index
+                    video_urls, 
+                    company=video_company, 
+                    category=video_category, 
+                    batch_size=video_batch_size, 
+                    start_index=video_start_index
                 )
                 
-                print(f"\n📊 Batch Summary:")
+                print(f"\n📊 Video Camera Batch Summary:")
                 print(f"  ✅ Files saved: {len(saved_files)}")
                 print(f"  📊 Next batch index: {next_index}")
-                print(f"  📊 Remaining URLs: {len(body_urls) - next_index}")
+                print(f"  📊 Remaining URLs: {len(video_urls) - next_index}")
                 
-                if next_index < len(body_urls):
-                    print(f"\n💡 To continue, update start_index to {next_index}")
+                if next_index < len(video_urls):
+                    print(f"\n💡 To continue video cameras, update video_start_index to {next_index}")
                 else:
-                    print(f"\n🎉 All URLs processed!")
+                    print(f"\n🎉 All video camera URLs processed!")
+            
+            print(f"\n{'='*50}")
+            print(f"=== SCRAPING COMPLETE ===")
+            print(f"{'='*50}")
             
         else:
             print("❌ Cannot access Canon website")

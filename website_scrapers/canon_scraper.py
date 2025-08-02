@@ -82,10 +82,15 @@ class CanonDataScraper:
             
             # Target specific Canon product pages
             target_urls = [
-                "https://www.usa.canon.com/shop/digital-cameras",
-                "https://www.usa.canon.com/shop/digital-cameras/mirrorless-cameras",
-                "https://www.usa.canon.com/shop/digital-cameras/dslr-cameras",
-                "https://www.usa.canon.com/shop/digital-cameras/point-and-shoot-cameras"
+            #    "https://www.usa.canon.com/shop/digital-cameras",
+            #    "https://www.usa.canon.com/shop/digital-cameras/mirrorless-cameras",
+            #    "https://www.usa.canon.com/shop/digital-cameras/dslr-cameras",
+            #    "https://www.usa.canon.com/shop/digital-cameras/point-and-shoot-cameras",
+            #    "https://www.usa.canon.com/shop/pro/cameras/ptz-remote-cameras",
+            #    "https://www.usa.canon.com/shop/pro/cameras/cinema-cameras",
+            #    "https://www.usa.canon.com/shop/pro/cameras/multi-purpose-cameras",
+            #    "https://www.usa.canon.com/shop/pro/cameras/pro-camcorders",
+                "https://www.usa.canon.com/shop/digital-cameras/camera-accessories"
             ]
 
             for target_url in target_urls:
@@ -102,8 +107,7 @@ class CanonDataScraper:
                     if new_urls:
                         print(f"  Sample URLs: {new_urls[:3]}")
                         
-                    if camera_urls:  # If we found URLs, we can stop
-                        break
+                    # Continue to next target URL to scan all pages
                         
                 except Exception as e:
                     print(f"Error accessing {target_url}: {e}")
@@ -194,9 +198,9 @@ class CanonDataScraper:
         for attempt in range(max_retries):
             try:
                 # Create output directory if it doesn't exist
-                base_dir = "/Users/darinhall/Documents/CRS_Database/company_product"
-                output_dir = f"{base_dir}/{company}/raw_html"
-                Path(output_dir).mkdir(exist_ok=True)
+                base_dir = Path("data/company_product")
+                output_dir = base_dir / company / "raw_html"
+                output_dir.mkdir(parents=True, exist_ok=True)
                 
                 # Use Playwright to get the page
                 if not self.page:
@@ -259,7 +263,7 @@ class CanonDataScraper:
 
     def save_all_product_html(self, urls, company="canon", category="body", start_from_index=0):
         """Save HTML for all product URLs with better tracking and bot detection avoidance"""
-        base_dir = "/Users/darinhall/Documents/CRS_Database/company_product"
+        base_dir = Path("data/company_product")
         saved_files = []
         failed_urls = []
         
@@ -599,11 +603,14 @@ class CanonDataScraper:
             
             # Target specific Canon lens pages
             target_urls = [
-                "https://www.usa.canon.com/shop/camera-lenses",
-                "https://www.usa.canon.com/shop/lenses/ef-lenses",
-                "https://www.usa.canon.com/shop/lenses/rf-lenses",
-                "https://www.usa.canon.com/shop/lenses/ef-s-lenses",
-                "https://www.usa.canon.com/shop/lenses/lenses"
+            #    "https://www.usa.canon.com/shop/camera-lenses",
+            #    "https://www.usa.canon.com/shop/lenses/ef-lenses",
+            #    "https://www.usa.canon.com/shop/lenses/rf-lenses",
+            #    "https://www.usa.canon.com/shop/lenses/ef-s-lenses",
+            #    "https://www.usa.canon.com/shop/lenses/lenses",
+            #    "https://www.usa.canon.com/shop/pro/lenses/cinema-lenses",
+            #    "https://www.usa.canon.com/shop/pro/lenses/broadcast-lenses",
+                 "https://www.usa.canon.com/shop/pro/lenses/lens-accessories"
             ]
 
             for target_url in target_urls:
@@ -861,67 +868,59 @@ if __name__ == "__main__":
         if scraper.test_canon_access():
             print("✅ Can access Canon website")
             
-
-            # Configuration for video cameras
-            video_company = "canon"
-            video_category = "video"
-            video_batch_size = 120  # Process 120 URLs at a time
-            video_start_index = 0  # Start from beginning
+            # Configuration for lenses
+            lens_company = "canon"
+            lens_category = "lens"
+            lens_batch_size = 120  # Process 120 URLs at a time
+            lens_start_index = 0  # Start from 0
             
+            print(f"\n=== Lens Scraping Configuration ===")
+            print(f"Company: {lens_company}")
+            print(f"Category: {lens_category}")
+            print(f"Batch size: {lens_batch_size}")
+            print(f"Start index: {lens_start_index}")
             
-            print(f"\n=== Video Camera Scraping Configuration ===")
-            print(f"Company: {video_company}")
-            print(f"Category: {video_category}")
-            print(f"Batch size: {video_batch_size}")
-            print(f"Start index: {video_start_index}")
-            
-            # Process Video Cameras
+            # Process Lenses
             print(f"\n{'='*50}")
-            print(f"=== PROCESSING VIDEO CAMERAS ===")
+            print(f"=== PROCESSING LENSES ===")
             print(f"{'='*50}")
             
             # Try to load existing URLs first
-            print(f"\n=== Loading Existing Video Camera URLs ===")
-            video_urls = scraper.load_urls_from_json(video_company, video_category)
-            print(f"DEBUG: video_urls type: {type(video_urls)}, value: {video_urls}")
+            print(f"\n=== Loading Existing Lens URLs ===")
+            lens_urls = scraper.load_urls_from_json(lens_company, lens_category)
             
-            if video_urls is None:
+            if lens_urls is None:
                 # If no existing URLs, discover them and save to JSON
-                print(f"\n=== Discovering Video Camera URLs ===")
-                video_urls = scraper.find_video_pages()
-                print(f"DEBUG: After find_video_pages(), video_urls type: {type(video_urls)}, length: {len(video_urls) if video_urls else 'None'}")
-                print(f"Found {len(video_urls)} video camera URLs")
+                print(f"\n=== Discovering Lens URLs ===")
+                lens_urls = scraper.find_lens_pages()
+                print(f"Found {len(lens_urls)} lens URLs")
                 
-                if video_urls and len(video_urls) > 0:
-                    print(f"\n=== Saving Video Camera URLs to JSON ===")
-                    scraper.save_urls_to_json(video_urls, video_company, video_category)
-                else:
-                    print("❌ No video camera URLs found during discovery!")
-                    video_urls = None  # Set to None so we don't proceed with empty list
+                if lens_urls:
+                    print(f"\n=== Saving Lens URLs to JSON ===")
+                    scraper.save_urls_to_json(lens_urls, lens_company, lens_category)
             
-            print(f"DEBUG: Final video_urls check - type: {type(video_urls)}, length: {len(video_urls) if video_urls else 'None'}")
-            if video_urls and len(video_urls) > 0:
-                print(f"\n=== Processing Video Camera URLs in Batches ===")
-                print(f"Total URLs available: {len(video_urls)}")
+            if lens_urls:
+                print(f"\n=== Processing Lens URLs in Batches ===")
+                print(f"Total URLs available: {len(lens_urls)}")
                 
                 # Process in batches
                 saved_files, next_index = scraper.scrape_in_batches(
-                    video_urls, 
-                    company=video_company, 
-                    category=video_category, 
-                    batch_size=video_batch_size, 
-                    start_index=video_start_index
+                    lens_urls, 
+                    company=lens_company, 
+                    category=lens_category, 
+                    batch_size=lens_batch_size, 
+                    start_index=lens_start_index
                 )
                 
-                print(f"\n📊 Video Camera Batch Summary:")
+                print(f"\n📊 Lens Batch Summary:")
                 print(f"  ✅ Files saved: {len(saved_files)}")
                 print(f"  📊 Next batch index: {next_index}")
-                print(f"  📊 Remaining URLs: {len(video_urls) - next_index}")
+                print(f"  📊 Remaining URLs: {len(lens_urls) - next_index}")
                 
-                if next_index < len(video_urls):
-                    print(f"\n💡 To continue video cameras, update video_start_index to {next_index}")
+                if next_index < len(lens_urls):
+                    print(f"\n💡 To continue lenses, update lens_start_index to {next_index}")
                 else:
-                    print(f"\n🎉 All video camera URLs processed!")
+                    print(f"\n🎉 All lens URLs processed!")
             
             print(f"\n{'='*50}")
             print(f"=== SCRAPING COMPLETE ===")

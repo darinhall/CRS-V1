@@ -90,7 +90,7 @@ class CanonDataScraper:
             #    "https://www.usa.canon.com/shop/pro/cameras/cinema-cameras",
             #    "https://www.usa.canon.com/shop/pro/cameras/multi-purpose-cameras",
             #    "https://www.usa.canon.com/shop/pro/cameras/pro-camcorders",
-                "https://www.usa.canon.com/shop/digital-cameras/camera-accessories"
+            #    "https://www.usa.canon.com/shop/digital-cameras/camera-accessories"
             ]
 
             for target_url in target_urls:
@@ -610,7 +610,9 @@ class CanonDataScraper:
             #    "https://www.usa.canon.com/shop/lenses/lenses",
             #    "https://www.usa.canon.com/shop/pro/lenses/cinema-lenses",
             #    "https://www.usa.canon.com/shop/pro/lenses/broadcast-lenses",
-                 "https://www.usa.canon.com/shop/pro/lenses/lens-accessories"
+            #     "https://www.usa.canon.com/shop/pro/lenses/lens-accessories"
+            #     "https://www.usa.canon.com/shop/pro/lenses"
+                 "https://www.usa.canon.com/shop/pro/lenses/broadcast-lenses"
             ]
 
             for target_url in target_urls:

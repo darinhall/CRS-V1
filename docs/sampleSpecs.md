@@ -1,7 +1,3 @@
-Just random things to keep track of... Not sure if it's the best way of doing it... but it has to be done
-
-- All "full table" separators indicate table-based listing for HTML site, the separators under the "full table" categories signify the major columns in the table, not the rows
-
 Canon
     Body
         Mirrorless
@@ -22,7 +18,6 @@ Canon
                 Low Pass Filter
                 Dust Deletion Feature
             Recording System
-                Recording System
                 Recording Format
                 Image Format
                 File Size (full table)
@@ -122,7 +117,7 @@ Canon
                     ON (Canon Log 3)
                 Estimated Recording time, Movie Bit Rate and File Size (full table)
                     Video Recording Size
-                    Total Recording Tiem (approx.)
+                    Total Recording Time (approx.)
                     Bit Rate/File Size (approx.)
                 Estimated Recording Time, Continued (full table)
                     Video Recording Size
@@ -160,7 +155,7 @@ Canon
                 Protection
                 Erase
             Direct Printing
-                Compatable Printers
+                Compatible Printers
             DPOF: Digital Print Order Format
                 DPOF
             Wi-Fi
@@ -171,7 +166,7 @@ Canon
                 Security (full table)
                     Connection Method
                     Authentication
-                    Excryption
+                    Encryption
                 Communication with a Smartphone
                 Remote Operation Using EOS Utility
                 Print from Wi-Fi Printers
@@ -332,7 +327,7 @@ Canon
                 Weight
             Operating Environment
                 Working Temperature Range
-                Workign Humidity Range
+                Working Humidity Range
             SDK / API Compatibility
                 USB Tethered SDK
             Product Disclaimer
@@ -384,7 +379,7 @@ Canon
                 USB
                 Mic
                 Headphone
-                REmote A(φ2.5mm)
+                Remote A(φ2.5mm)
                 TC (Time Code)
                 DC-In
             Power/Other
@@ -485,7 +480,7 @@ Canon
                 White Balance Shift
             Autofocus
                 Focus Method
-                Focosuing Operation (Full Table)
+                Focusing Operation (Full Table)
                     Still Photo Shooting
                     Movie Recording
                 Whole Area AF Coverage (Full Table)
@@ -539,9 +534,9 @@ Canon
                 Function
             Customization
                 Custom Functions
-                Cuztomize Buttons, Dials
+                Customize Buttons, Dials
             Wi-Fi
-                Supposting Standards
+                Supporting Standards
                 Transmission Method
                 Transition Frequency (Central Frequency)
                 Security (Full Table)
@@ -551,7 +546,7 @@ Canon
                 Send Images to a Web Service
             Bluetooth
                 Standards Compliance
-                Transition Mehtod
+                Transition Method
                 Bluetooth Pairing
             Video Calls / Streaming
                 Video Calls
@@ -578,7 +573,7 @@ Canon
                 Working Humidity Range
         EF Lens
             Main Unit Spec
-                Focal Length & Maxium Aperture
+                Focal Length & Maximum Aperture
                 Lens Construction
                 Diagonal Angle of View
                 Focus Adjustment

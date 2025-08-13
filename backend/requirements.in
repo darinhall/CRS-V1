@@ -1,3 +1,4 @@
+# Core dependencies for the CRS-V1 package
 beautifulsoup4==4.13.4
 certifi==2025.7.14
 charset-normalizer==3.4.2
@@ -10,3 +11,6 @@ requests==2.32.4
 soupsieve==2.7
 typing_extensions==4.14.1
 urllib3==2.5.0
+
+# Development dependencies
+pip-tools

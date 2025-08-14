@@ -1,18 +1,30 @@
 #!/bin/bash
 
 # === CONFIG ===
+# Allow custom environment location via ENV_PATH, default to project root
 ENV_NAME="website_scrapers_env"
 PYTHON_VERSION="python3"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_DIR="$PROJECT_ROOT/backend"
 
+# Use ENV_PATH if set, otherwise default to project root
+if [ -n "$ENV_PATH" ]; then
+    ENV_LOCATION="$ENV_PATH/$ENV_NAME"
+    echo "Using custom environment path: $ENV_LOCATION"
+else
+    ENV_LOCATION="$PROJECT_ROOT/$ENV_NAME"
+    echo "Using default environment path: $ENV_LOCATION"
+    echo "To use a custom location, set ENV_PATH environment variable:"
+    echo "export ENV_PATH=/path/to/your/environments"
+fi
+
 # === CREATE ENVIRONMENT ===
 echo "Creating virtual environment: $ENV_NAME"
-$PYTHON_VERSION -m venv "$PROJECT_ROOT/$ENV_NAME"
+$PYTHON_VERSION -m venv "$ENV_LOCATION"
 
 # === ACTIVATE ENVIRONMENT ===
 echo "Activating environment..."
-source "$PROJECT_ROOT/$ENV_NAME/bin/activate"
+source "$ENV_LOCATION/bin/activate"
 
 # === INSTALL BASIC DEPENDENCIES ===
 echo "Installing common scraping packages..."
@@ -44,7 +56,10 @@ fi
 # === APPEND STANDARD PYTHON IGNORE RULES ===
 echo "Adding venv and large file rules to .gitignore..."
 cd "$PROJECT_ROOT"
-grep -qxF "$ENV_NAME/" .gitignore || echo "$ENV_NAME/" >> .gitignore
+# Only add to gitignore if using default location
+if [ -z "$ENV_PATH" ]; then
+    grep -qxF "$ENV_NAME/" .gitignore || echo "$ENV_NAME/" >> .gitignore
+fi
 grep -qxF '__pycache__/' .gitignore || echo '__pycache__/' >> .gitignore
 grep -qxF '*.pyc' .gitignore || echo '*.pyc' >> .gitignore
 grep -qxF '*.DS_Store' .gitignore || echo '*.DS_Store' >> .gitignore
@@ -54,5 +69,9 @@ grep -qxF '*.db' .gitignore || echo '*.db' >> .gitignore
 
 # === FINISH ===
 echo "✅ Setup complete. You are now in the '$ENV_NAME' environment."
-echo "To activate it later, run: source $PROJECT_ROOT/$ENV_NAME/bin/activate"
+echo "To activate it later, run: source $ENV_LOCATION/bin/activate"
 echo "Project root: $PROJECT_ROOT"
+echo ""
+echo "💡 Tip: To use a custom environment location in the future:"
+echo "export ENV_PATH=/path/to/your/environments"
+echo "Then run this script again."

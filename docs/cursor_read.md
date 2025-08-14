@@ -1,1 +1,0 @@
-This is a file detailing the history of certain projects to help manage Cursor's memory management; this file can be read and parsed through to aid with the consistency of memory management, surpassing the current limitations of chat bot context windows

@@ -14,14 +14,96 @@ class CanonSpecAnalysisTest(unittest.TestCase):
         """Set up test fixtures."""
         self.data_dir = Path("data/company_product/canon/raw_html")
         self.output_file = Path("tests/unit/website_scrapers/canon_mirrorless_spec_analysis.json")
-        self.eos_r_files = []
+        self.mirrorless_camera_files = []
         
-        # Find all EOS R camera HTML files
+        # Find all EOS R camera HTML files and filter for actual mirrorless cameras
         for file_path in self.data_dir.glob("eos-r*.html"):
             if file_path.is_file():
-                self.eos_r_files.append(file_path)
+                # Check if this is a legitimate mirrorless camera (not a kit or bundle)
+                if self._is_legitimate_mirrorless_camera(file_path):
+                    self.mirrorless_camera_files.append(file_path)
         
-        print(f"Found {len(self.eos_r_files)} EOS R camera files for analysis")
+        print(f"Found {len(self.mirrorless_camera_files)} legitimate mirrorless camera files for analysis")
+    
+    def _is_legitimate_mirrorless_camera(self, file_path):
+        """
+        Determine if a file represents a legitimate mirrorless camera (not a kit or bundle).
+        
+        Exclusion criteria:
+        - Contains 'kit' in filename (lens kits)
+        - Contains 'mm' in filename (lens bundles)
+        - Contains 'creator' in filename (creator kits)
+        - Contains 'content' in filename (content creator kits)
+        - Contains 'vlogging' in filename (vlogging kits)
+        - Contains 'firmware' in filename (firmware updates)
+        - Contains 'cropping' in filename (cropping guide firmware)
+        - Contains 'stop-motion' in filename (stop motion firmware)
+        """
+        filename = file_path.stem.lower()
+        
+        # Exclusion patterns
+        exclusion_patterns = [
+            'kit',
+            'mm',  # Lens focal lengths
+            'creator',
+            'content',
+            'vlogging',
+            'firmware',
+            'cropping',
+            'stop-motion',
+            'double-zoom'
+        ]
+        
+        # Check if filename contains any exclusion patterns
+        for pattern in exclusion_patterns:
+            if pattern in filename:
+                print(f"  ❌ Excluding {file_path.name} (contains '{pattern}')")
+                return False
+        
+        # Additional check: verify it's actually a mirrorless camera by checking content
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            
+            # Check if the file contains mirrorless camera specifications
+            if self._has_mirrorless_specifications(html_content):
+                print(f"  ✅ Including {file_path.name} (confirmed mirrorless camera)")
+                return True
+            else:
+                print(f"  ⚠️  Excluding {file_path.name} (no mirrorless specifications found)")
+                return False
+                
+        except Exception as e:
+            print(f"  ❌ Error reading {file_path.name}: {e}")
+            return False
+    
+    def _has_mirrorless_specifications(self, html_content):
+        """
+        Check if the HTML content contains mirrorless camera specifications.
+        
+        This method looks for:
+        1. The specific "Digital interchangeable lens, mirrorless camera" specification
+        2. Alternative indicators of mirrorless cameras in the content
+        """
+        # Primary check: look for the specific mirrorless camera specification
+        if "Digital interchangeable lens, mirrorless camera" in html_content:
+            return True
+        
+        # Secondary checks: look for other mirrorless indicators
+        mirrorless_indicators = [
+            "mirrorless camera",
+            "full-frame mirrorless",
+            "aps-c mirrorless",
+            "eos r",
+            "rf mount"
+        ]
+        
+        content_lower = html_content.lower()
+        for indicator in mirrorless_indicators:
+            if indicator in content_lower:
+                return True
+        
+        return False
     
     def test_analyze_canon_mirrorless_specs(self):
         """Test to analyze and compare technical specifications across Canon mirrorless cameras."""
@@ -33,8 +115,8 @@ class CanonSpecAnalysisTest(unittest.TestCase):
         attribution_group_frequency = Counter()
         spec_attribute_frequency = Counter()
         
-        # Process each EOS R camera file
-        for file_path in self.eos_r_files:
+        # Process each legitimate mirrorless camera file
+        for file_path in self.mirrorless_camera_files:
             camera_name = file_path.stem
             print(f"Processing: {camera_name}")
             
@@ -48,7 +130,11 @@ class CanonSpecAnalysisTest(unittest.TestCase):
                 tech_spec_section = soup.find('div', id='tech-spec-data')
                 if not tech_spec_section:
                     print(f"  ⚠️  No technical specifications found in {camera_name}")
-                    continue
+                    # Try alternative specification sections
+                    tech_spec_section = self._find_alternative_spec_section(soup)
+                    if not tech_spec_section:
+                        print(f"  ❌ No specifications found in {camera_name}")
+                        continue
                 
                 # Extract camera specifications
                 camera_data = self._extract_camera_specs(tech_spec_section, camera_name)
@@ -91,6 +177,55 @@ class CanonSpecAnalysisTest(unittest.TestCase):
         print(f"   - Processed {len(camera_specs)} cameras")
         print(f"   - Found {len(all_attribution_groups)} unique attribution groups")
         print(f"   - Found {len(all_spec_attributes)} unique spec attributes")
+    
+    def _find_alternative_spec_section(self, soup):
+        """
+        Find alternative specification sections when the standard tech-spec-data is not available.
+        
+        This method looks for:
+        1. Other div elements containing specification data
+        2. Tables with specification information
+        3. Lists containing technical details
+        """
+        # Look for alternative specification containers
+        alternative_selectors = [
+            'div[class*="spec"]',
+            'div[class*="tech"]',
+            'div[class*="product"]',
+            'table[class*="spec"]',
+            'section[class*="spec"]'
+        ]
+        
+        for selector in alternative_selectors:
+            elements = soup.select(selector)
+            for element in elements:
+                # Check if this element contains specification-like content
+                if self._contains_specification_content(element):
+                    return element
+        
+        return None
+    
+    def _contains_specification_content(self, element):
+        """
+        Check if an element contains specification-like content.
+        """
+        text = element.get_text().lower()
+        
+        # Look for common specification terms
+        spec_terms = [
+            'sensor',
+            'resolution',
+            'iso',
+            'autofocus',
+            'shutter',
+            'lens',
+            'mount',
+            'battery',
+            'dimensions',
+            'weight'
+        ]
+        
+        return any(term in text for term in spec_terms)
     
     def _extract_camera_specs(self, tech_spec_section, camera_name):
         """Extract specifications from a technical specifications section."""
@@ -178,7 +313,11 @@ class CanonSpecAnalysisTest(unittest.TestCase):
                 'total_cameras_analyzed': len(camera_specs),
                 'total_attribution_groups': len(all_attribution_groups),
                 'total_spec_attributes': len(all_spec_attributes),
-                'analysis_timestamp': str(Path().cwd())
+                'analysis_timestamp': str(Path().cwd()),
+                'filtering_criteria': {
+                    'excluded_patterns': ['kit', 'mm', 'creator', 'content', 'vlogging', 'firmware', 'cropping', 'stop-motion', 'double-zoom'],
+                    'inclusion_criteria': ['Digital interchangeable lens, mirrorless camera', 'mirrorless camera', 'full-frame mirrorless', 'aps-c mirrorless', 'eos r', 'rf mount']
+                }
             },
             'attribution_groups': {
                 'all_groups': sorted(list(all_attribution_groups)),
@@ -241,7 +380,8 @@ class CanonSpecAnalysisTest(unittest.TestCase):
             'optional_attribution_groups': [],
             'optional_spec_attributes': [],
             'parser_structure_suggestions': [],
-            'data_consistency_notes': []
+            'data_consistency_notes': [],
+            'filtering_recommendations': []
         }
         
         # Identify core attribution groups (present in >50% of cameras)
@@ -283,7 +423,8 @@ class CanonSpecAnalysisTest(unittest.TestCase):
             "Use div.tech-spec-attr pairs for attribute name and value extraction",
             "Handle missing attributes gracefully (not all cameras have all specs)",
             "Consider value normalization for consistent data storage",
-            "Implement fallback parsing for variations in HTML structure"
+            "Implement fallback parsing for variations in HTML structure",
+            "Check for 'Digital interchangeable lens, mirrorless camera' specification to confirm camera type"
         ]
         
         # Data consistency notes
@@ -291,6 +432,16 @@ class CanonSpecAnalysisTest(unittest.TestCase):
             f"Found {len(analysis['value_variations'])} attributes with varying values across cameras",
             f"Most common attribution group: {max(analysis['attribution_groups']['frequency_analysis'].items(), key=lambda x: x[1])[0] if analysis['attribution_groups']['frequency_analysis'] else 'None'}",
             f"Most common spec attribute: {max(analysis['spec_attributes']['frequency_analysis'].items(), key=lambda x: x[1])[0] if analysis['spec_attributes']['frequency_analysis'] else 'None'}"
+        ]
+        
+        # Filtering recommendations
+        recommendations['filtering_recommendations'] = [
+            "Exclude files with 'kit' in filename to avoid lens kits",
+            "Exclude files with 'mm' in filename to avoid lens bundles",
+            "Exclude files with 'creator', 'content', 'vlogging' to avoid creator kits",
+            "Exclude files with 'firmware', 'cropping', 'stop-motion' to avoid firmware updates",
+            "Verify mirrorless camera type by checking for 'Digital interchangeable lens, mirrorless camera' specification",
+            "Use alternative indicators like 'mirrorless camera', 'full-frame mirrorless', 'rf mount' when primary spec is not found"
         ]
         
         return recommendations

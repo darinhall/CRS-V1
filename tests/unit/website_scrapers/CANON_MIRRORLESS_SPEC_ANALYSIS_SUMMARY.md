@@ -11,7 +11,7 @@ This analysis examines the technical specifications of **13 legitimate Canon mir
 - **Total Cameras Analyzed**: 13
 - **Total Attribution Groups**: 37 unique groups
 - **Total Spec Attributes**: 223 unique attributes
-- **Analysis Date**: January 2025
+- **Analysis Date**: August 2025
 
 ### 🎯 Filtering Criteria
 

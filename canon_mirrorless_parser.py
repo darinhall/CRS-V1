@@ -43,14 +43,13 @@ class CanonMirrorlessParser:
         # Schema template based on body_mirrorless.json
         self.schema_template = {
             "product": "",
-            "type": {"metadata": {"table": False}, "value": ""},
             "image_processor": {"metadata": {"table": False}, "value": ""},
             "recording_media": {"metadata": {"table": False}, "value": ""},
             "compatible_lens": {"metadata": {"table": False}, "value": ""},
             "lens_mount": {"metadata": {"table": False}, "value": ""},
-            "image_sensor": {"metadata": {"table": False}, "value": ""},
             "effective_pixels": {"metadata": {"table": False}, "value": ""},
             "screen_size": {"metadata": {"table": False}, "value": ""},
+            "lcd_monitor_size": {"metadata": {"table": False}, "value": ""},
             "pixel_unit": {"metadata": {"table": False}, "value": ""},
             "total_pixels": {"metadata": {"table": False}, "value": ""},
             "aspect_ratio": {"metadata": {"table": False}, "value": ""},
@@ -66,7 +65,6 @@ class CanonMirrorlessParser:
             "white_balance": {"metadata": {"table": False}, "value": ""},
             "auto_white_balance": {"metadata": {"table": False}, "value": ""},
             "white_balance_shift": {"metadata": {"table": False}, "value": ""},
-            "viewfinder": {"metadata": {"table": False}, "value": ""},
             "coverage": {"metadata": {"table": False}, "value": ""},
             "magnification_/_angle_of_view": {"metadata": {"table": False}, "value": ""},
             "eye_point": {"metadata": {"table": False}, "value": ""},
@@ -136,6 +134,15 @@ class CanonMirrorlessParser:
             
             # Extract camera specifications
             camera_data = self._extract_camera_specs(tech_spec_section, camera_name)
+            
+            # Debug output for all cameras
+            print(f"  🔍 Debug: Found {len(camera_data['attribution_group_details'])} specification groups")
+            for group_name, group_details in camera_data['attribution_group_details'].items():
+                print(f"    📋 Group: {group_name}")
+                print(f"      Attributes: {group_details['attributes']}")
+                for attr_name in group_details['attributes']:
+                    if 'type' in attr_name.lower():
+                        print(f"      🔍 Type attribute '{attr_name}': {group_details['values'].get(attr_name, '')}")
             
             # Convert to schema format
             schema_data = self.convert_to_schema_format(camera_data, camera_name)
@@ -319,18 +326,42 @@ class CanonMirrorlessParser:
     
     def convert_to_schema_format(self, camera_data, camera_name):
         """Convert extracted data to the schema format."""
-        schema_data = self.schema_template.copy()
+        import copy
+        schema_data = copy.deepcopy(self.schema_template)
         
         # Set the product name
         schema_data['product'] = camera_name.replace('-', ' ').upper()
         
-        # Improved spec mapping with context awareness
+        # Create a mapping to store all extracted attributes with their group context
+        all_attributes = {}
+        
+        # First pass: collect all attributes with their group context
+        for group_name, group_details in camera_data['attribution_group_details'].items():
+            for attr_name in group_details['attributes']:
+                attr_value = group_details['values'].get(attr_name, '')
+                
+                # Create a unique key by combining group name and attribute name
+                # Clean and normalize the group name for use as a prefix
+                group_prefix = self._clean_text(group_name).lower().replace(' ', '_').replace('-', '_')
+                attr_clean = self._clean_text(attr_name).lower().replace(' ', '_').replace('-', '_')
+                
+                # Create unique key: ONLY append group prefix if the attribute name is "type"
+                # This prevents confusion between multiple "type" attributes in different groups
+                if attr_clean.lower() == 'type':
+                    unique_key = f"type_{group_prefix}"
+                else:
+                    unique_key = attr_clean
+                
+                # Store the attribute with its context
+                all_attributes[unique_key] = {
+                    'value': attr_value,
+                    'original_name': attr_name,
+                    'group': group_name,
+                    'unique_key': unique_key
+                }
+        
+        # Improved spec mapping with context awareness - REMOVED generic 'type' mapping
         spec_mapping = {
-            'type': {
-                'patterns': ['type'],
-                'context_groups': ['type'],  # Only match in "Type" group
-                'exclude_patterns': ['monitor', 'screen', 'lcd', 'tft', 'viewfinder', 'sensor']
-            },
             'image_processor': {
                 'patterns': ['image processor', 'processor', 'digic'],
                 'context_groups': ['type']
@@ -347,21 +378,20 @@ class CanonMirrorlessParser:
                 'patterns': ['lens mount', 'mount', 'rf mount', 'ef mount'],
                 'context_groups': ['type']
             },
-            'image_sensor': {
-                'patterns': ['type'],
-                'context_groups': ['image sensor'],
-                'exclude_patterns': ['monitor', 'screen', 'lcd', 'tft', 'viewfinder']
-            },
             'effective_pixels': {
                 'patterns': ['effective pixels', 'effective pixel', 'resolution'],
                 'context_groups': ['image sensor']
             },
             'screen_size': {
-                'patterns': ['monitor size', 'screen size', 'lcd size'],
+                'patterns': ['screen size'],
+                'context_groups': ['image sensor']
+            },
+            'lcd_monitor_size': {
+                'patterns': ['monitor size'],
                 'context_groups': ['lcd screen']
             },
             'pixel_unit': {
-                'patterns': ['pixel size'],
+                'patterns': ['pixel unit', 'pixel size'],
                 'context_groups': ['image sensor']
             },
             'total_pixels': {
@@ -415,11 +445,6 @@ class CanonMirrorlessParser:
             'white_balance_shift': {
                 'patterns': ['white balance shift', 'wb shift'],
                 'context_groups': ['white balance']
-            },
-            'viewfinder': {
-                'patterns': ['type'],
-                'context_groups': ['viewfinder'],
-                'exclude_patterns': ['monitor', 'screen', 'lcd', 'tft', 'sensor']
             },
             'coverage': {
                 'patterns': ['coverage'],
@@ -487,6 +512,8 @@ class CanonMirrorlessParser:
                 if context_groups and not any(context.lower() in group_name.lower() for context in context_groups):
                     continue
                 
+
+                
                 # Look for matching attributes in this group
                 for attr_name in group_details['attributes']:
                     attr_value = group_details['values'].get(attr_name, '')
@@ -522,7 +549,7 @@ class CanonMirrorlessParser:
                     # Break out of attribute loop since we found a match
                     break
                 
-                # Break out of group loop if we found a match
+                # Break out of group loop if we found a match for this schema field
                 if schema_field in schema_data and schema_data[schema_field].get('value'):
                     break
         
@@ -531,7 +558,32 @@ class CanonMirrorlessParser:
             if 'file size' in group_name.lower() or 'recording format' in group_name.lower():
                 schema_data['file_size'] = table_data
         
-        return schema_data
+        # Create a new ordered schema with type attributes in the correct positions
+        from collections import OrderedDict
+        ordered_schema = OrderedDict()
+        
+        # Add product first
+        ordered_schema['product'] = schema_data['product']
+        
+        # Add type attributes first (in order of appearance in HTML)
+        type_attributes = OrderedDict()
+        for unique_key, attr_info in all_attributes.items():
+            if unique_key.startswith('type_'):
+                type_attributes[unique_key] = {
+                    'metadata': {'table': False},
+                    'value': attr_info['value']
+                }
+        
+        # Add type attributes in order
+        for key, value in type_attributes.items():
+            ordered_schema[key] = value
+        
+        # Add all other schema fields
+        for key, value in schema_data.items():
+            if key != 'product' and not key.startswith('type_'):
+                ordered_schema[key] = value
+        
+        return ordered_schema
     
     def create_empty_spec(self, camera_name):
         """Create an empty specification entry for cameras with missing data."""

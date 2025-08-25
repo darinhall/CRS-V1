@@ -17,9 +17,9 @@ class CanonDataEnrichment:
     """Safe data enrichment system for Canon camera specifications."""
     
     def __init__(self):
-        self.input_file = Path("data/company_product/canon/processed_data/schema/body_mirrorless_comprehensive.json")
-        self.output_file = Path("data/company_product/canon/processed_data/schema/body_mirrorless_enriched.json")
-        self.backup_file = Path("data/company_product/canon/processed_data/schema/body_mirrorless_comprehensive_backup.json")
+        self.input_file = Path("data/company_product/canon/processed_data/schema/body_mirrorless2.json")
+        self.output_file = Path("data/company_product/canon/processed_data/schema/body_mirrorless2_enriched.json")
+        self.backup_file = Path("data/company_product/canon/processed_data/schema/body_mirrorless2_backup.json")
         
         # Load reference data sources
         self.reference_data = self.load_reference_data()
@@ -34,9 +34,14 @@ class CanonDataEnrichment:
         
         # Common values that appear across multiple cameras
         reference['common_values'] = {
-            'type': 'Digital single-lens non-reflex AF/AE camera',
-            'image_processor': 'DIGIC X',
-            'lens_mount': 'Canon RF mount',
+            'type_type_type': 'Digital single-lens non-reflex AF/AE camera',
+            'type_image_processor': 'DIGIC X',
+            'type_lens_mount': 'Canon RF mount',
+            'type_image_sensor_type': 'Canon designed full-frame back-illuminated stacked CMOS sensor (compatible with Dual Pixel CMOS AF and Cross-type AF)',
+            'type_viewfinder_type': 'OLED color electronic viewfinder; 0.5-inch, approx. 9.44 million dots',
+            'type_shutter_type': 'Electronically controlled focal-plane shutter(1) Electronic first curtain(2) Mechanical shutter(3) Electronic shutter',
+            'type_lcd_screen_type': 'TFT color, liquid-crystal monitor',
+            'type_autofocus_cross_type_af': 'Supported* Dual Pixel CMOS AF has been vertical-line detection only with previous models, but the EOS R1 can perform not only vertical-line detection but also horizontal-line detection by rotating the pupil division direction of the Gb pixels of the CMOS sensor by 90 degrees',
             'color_filter_system': 'RGB primary color filters',
             'low_pass_filter': 'Installed in front of the image sensor, non-detachable',
             'recording_format': 'Compliant to Design rule for Camera File system 2.0 and Exif 2.3',
@@ -59,6 +64,16 @@ class CanonDataEnrichment:
         # Camera-specific values (model-dependent)
         reference['camera_specific'] = {
             'EOS R1': {
+                'type_type_type': 'Digital interchangeable lens, mirrorless camera',
+                'type_image_processor': 'DIGIC X (with DIGIC Accelerator co-processor)',
+                'type_recording_media': '(Two) CFexpress Type B card slots• compatible with CFexpress 2.0 and VPG400',
+                'type_compatible_lenses': 'Canon RF lens group (including RF-S lenses)When using Mount Adapter EF-EOS R: Canon EF or EF-S lenses (excluding EF-M lenses)',
+                'type_lens_mount': 'Canon RF mount',
+                'type_image_sensor_type': 'Canon designed full-frame back-illuminated stacked CMOS sensor (compatible with Dual Pixel CMOS AF and Cross-type AF)',
+                'type_viewfinder_type': 'OLED color electronic viewfinder; 0.5-inch, approx. 9.44 million dots',
+                'type_autofocus_cross_type_af': 'Supported* Dual Pixel CMOS AF has been vertical-line detection only with previous models, but the EOS R1 can perform not only vertical-line detection but also horizontal-line detection by rotating the pupil division direction of the Gb pixels of the CMOS sensor by 90 degrees',
+                'type_shutter_type': 'Electronically controlled focal-plane shutter(1) Electronic first curtain(2) Mechanical shutter(3) Electronic shutter',
+                'type_lcd_screen_type': 'TFT color, liquid-crystal monitor',
                 'effective_pixels': 'Approx. 24.0 megapixels',
                 'total_pixels': 'Approx. 27.1 megapixels',
                 'screen_size': '3.0-inch (screen aspect ratio of 3:2)',
@@ -67,6 +82,15 @@ class CanonDataEnrichment:
                 'dimensions_w_x_h_x_d': 'Approx. 158.4 × 165.7 × 87.8mm'
             },
             'EOS R3': {
+                'type_type_type': 'Digital interchangeable lens, mirrorless camera',
+                'type_image_processor': 'DIGIC X',
+                'type_recording_media': 'SD/SDHC/SDXC memory cards',
+                'type_compatible_lenses': 'Canon RF lens group (excluding EF, EF-S and EF-M lenses)When using Mount Adapter EF-EOS R: Canon EF or EF-S lenses (excluding EF-M lenses)',
+                'type_lens_mount': 'Canon RF mount',
+                'type_image_sensor_type': 'CMOS sensor (compatible with Dual Pixel CMOS AF)',
+                'type_viewfinder_type': 'OLED color electronic viewfinder',
+                'type_shutter_type': 'Electronically controlled focal-plane shutter',
+                'type_lcd_screen_type': 'TFT color, liquid-crystal monitor',
                 'effective_pixels': 'Approx. 24.1 megapixels',
                 'total_pixels': 'Approx. 25.5 megapixels',
                 'screen_size': '3.2-inch (screen aspect ratio of 3:2)',
@@ -75,6 +99,15 @@ class CanonDataEnrichment:
                 'dimensions_w_x_h_x_d': 'Approx. 150.0 × 142.6 × 87.2mm'
             },
             'EOS R5': {
+                'type_type_type': 'Digital interchangeable lens, mirrorless camera',
+                'type_image_processor': 'DIGIC X',
+                'type_recording_media': 'SD/SDHC/SDXC memory cards',
+                'type_compatible_lenses': 'Canon RF lens group (excluding EF, EF-S and EF-M lenses)When using Mount Adapter EF-EOS R: Canon EF or EF-S lenses (excluding EF-M lenses)',
+                'type_lens_mount': 'Canon RF mount',
+                'type_image_sensor_type': 'CMOS sensor (compatible with Dual Pixel CMOS AF)',
+                'type_viewfinder_type': 'OLED color electronic viewfinder',
+                'type_shutter_type': 'Electronically controlled focal-plane shutter',
+                'type_lcd_screen_type': 'TFT color, liquid-crystal monitor',
                 'effective_pixels': 'Approx. 45.0 megapixels',
                 'total_pixels': 'Approx. 46.1 megapixels',
                 'screen_size': '3.2-inch (screen aspect ratio of 3:2)',

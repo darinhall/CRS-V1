@@ -1,14 +1,20 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { GeistSans } from "geist/font/sans"
-import { GeistMono } from "geist/font/mono"
+import { Inter } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
 import "./globals.css"
 
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-aktiv-grotesk",
+  display: "swap",
+})
+
 export const metadata: Metadata = {
-  title: "Altoscope - Professional Camera Equipment Platform",
-  description: "Discover, research, and rent professional camera equipment. Connect with the photography community.",
+  title: "Altoscope - Camera Equipment Database & Education Hub",
+  description:
+    "Empowering visual creators through comprehensive camera equipment knowledge, specifications, and educational resources.",
   generator: "v0.app",
 }
 
@@ -19,15 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} dark`}>
+      <body className={`font-sans ${inter.variable}`}>
         <Suspense fallback={null}>{children}</Suspense>
         <Analytics />
       </body>

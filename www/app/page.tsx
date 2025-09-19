@@ -1,255 +1,218 @@
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Camera, Search, Users, ShoppingCart, Star, ArrowRight, Database, MapPin } from "lucide-react"
-import Link from "next/link"
+import { Camera, BookOpen, Users, Search, Zap, Target } from "lucide-react"
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-background dark">
-      {/* Header */}
-      <header className="border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Camera className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold text-foreground">Altoscope</span>
-          </div>
-          <nav className="hidden md:flex items-center space-x-6">
-            <Link href="#features" className="text-muted-foreground hover:text-foreground transition-colors">
-              Features
-            </Link>
-            <Link href="#marketplace" className="text-muted-foreground hover:text-foreground transition-colors">
-              Marketplace
-            </Link>
-            <Link href="/explore" className="text-muted-foreground hover:text-foreground transition-colors">
-              Explore
-            </Link>
-            <Button variant="outline" size="sm">
-              Sign In
-            </Button>
-            <Button size="sm">Get Started</Button>
-          </nav>
-        </div>
-      </header>
-
-      {/* Hero Section */}
-      <section className="relative py-20 lg:py-32 overflow-hidden">
-        <div className="absolute inset-0 gradient-bg" />
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-accent/5 to-primary/10" />
-        <div className="container mx-auto px-4 relative">
-          <div className="max-w-4xl mx-auto text-center">
-            <Badge variant="secondary" className="mb-6 glow-effect">
-              Trusted by 10,000+ Visual Creators
-            </Badge>
-            <h1 className="text-4xl lg:text-6xl font-bold text-balance mb-6">
-              The Ultimate Platform for <span className="gradient-text">Camera Equipment</span>
-            </h1>
-            <p className="text-xl text-muted-foreground text-balance mb-8 max-w-2xl mx-auto">
-              Discover, research, and rent professional camera gear. Connect with rental houses, studios, and fellow
-              creators in one comprehensive ecosystem.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-              <Button size="lg" className="text-lg px-8 glow-effect">
-                Explore Equipment
-                <ArrowRight className="ml-2 h-5 w-5" />
+    <div className="min-h-screen bg-background">
+      {/* Navigation */}
+      <nav className="border-b border-border">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-2">
+              <Camera className="h-8 w-8 text-secondary" />
+              <span className="text-2xl font-bold text-foreground">Altoscope</span>
+            </div>
+            <div className="hidden md:flex items-center space-x-8">
+              <a href="#database" className="text-muted-foreground hover:text-foreground transition-colors">
+                Database
+              </a>
+              <a href="#guides" className="text-muted-foreground hover:text-foreground transition-colors">
+                Guides
+              </a>
+              <a href="#community" className="text-muted-foreground hover:text-foreground transition-colors">
+                Community
+              </a>
+              <Button variant="outline" size="sm">
+                Sign In
               </Button>
-              <Button variant="outline" size="lg" className="text-lg px-8 bg-transparent border-primary/50 hover:bg-primary/10">
-                Browse Rentals
+              <Button size="sm" className="bg-secondary text-secondary-foreground hover:bg-secondary/90">
+                Get Started
               </Button>
             </div>
+          </div>
+        </div>
+      </nav>
 
-            {/* Search Bar */}
-            <div className="max-w-2xl mx-auto">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-                <Input
-                  placeholder="Search cameras, lenses, lighting equipment..."
-                  className="pl-12 h-14 text-lg bg-card/50 border-2 border-primary/30 backdrop-blur-sm"
-                />
-                <Button className="absolute right-2 top-2 h-10 glow-effect">Search</Button>
-              </div>
+      {/* Hero Section */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center">
+            <Badge variant="secondary" className="mb-6 bg-secondary/10 text-secondary border-secondary/20">
+              Knowledge Hub for Visual Creators
+            </Badge>
+            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-balance mb-6">
+              Empower your vision with <span className="text-secondary">comprehensive</span> camera knowledge.
+            </h1>
+            <p className="text-xl text-muted-foreground text-balance max-w-3xl mx-auto mb-8">
+              Discover, research, and master professional camera equipment through the industry's most robust database
+              and educational resources. From concept to completion, we support every creative workflow.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button size="lg" className="bg-secondary text-secondary-foreground hover:bg-secondary/90">
+                Explore the Hub
+              </Button>
+              <Button variant="outline" size="lg">
+                View Database
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Stats Section */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8 border-y border-border">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-secondary mb-2">10,000+</div>
+              <div className="text-muted-foreground">Equipment Specs</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-secondary mb-2">500+</div>
+              <div className="text-muted-foreground">Learning Guides</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-secondary mb-2">50,000+</div>
+              <div className="text-muted-foreground">Visual Creators</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-secondary mb-2">99%</div>
+              <div className="text-muted-foreground">Accuracy Rate</div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 bg-muted/20">
-        <div className="container mx-auto px-4">
+      <section id="database" className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold mb-4">Everything You Need in One Platform</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Everything you need to make informed decisions</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              From comprehensive gear databases to seamless rentals, we've built the tools visual creators need.
+              Our comprehensive platform combines detailed specifications, educational content, and community insights.
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <Card className="card-gradient float-animation">
-              <CardHeader>
-                <Database className="h-12 w-12 text-primary mb-4 glow-effect" />
-                <CardTitle>Comprehensive Database</CardTitle>
-                <CardDescription>
-                  Access detailed specifications, reviews, and comparisons for thousands of professional cameras,
-                  lenses, and accessories.
-                </CardDescription>
-              </CardHeader>
+            <Card className="bg-card border-border">
+              <CardContent className="p-6">
+                <Search className="h-12 w-12 text-secondary mb-4" />
+                <h3 className="text-xl font-bold mb-2">Comprehensive Database</h3>
+                <p className="text-muted-foreground">
+                  Access detailed specifications for thousands of cameras, lenses, and accessories from every major
+                  manufacturer.
+                </p>
+              </CardContent>
             </Card>
 
-            <Card className="card-gradient float-animation" style={{ animationDelay: '0.5s' }}>
-              <CardHeader>
-                <ShoppingCart className="h-12 w-12 text-accent mb-4 glow-effect" />
-                <CardTitle>Rental Marketplace</CardTitle>
-                <CardDescription>
-                  Connect with verified rental houses and individual owners. Book equipment with confidence and
-                  transparent pricing.
-                </CardDescription>
-              </CardHeader>
+            <Card className="bg-card border-border">
+              <CardContent className="p-6">
+                <BookOpen className="h-12 w-12 text-secondary mb-4" />
+                <h3 className="text-xl font-bold mb-2">Educational Guides</h3>
+                <p className="text-muted-foreground">
+                  Learn from expert tutorials, comparison guides, and in-depth reviews to master your craft.
+                </p>
+              </CardContent>
             </Card>
 
-            <Card className="card-gradient float-animation" style={{ animationDelay: '1s' }}>
-              <CardHeader>
-                <Users className="h-12 w-12 text-primary mb-4 glow-effect" />
-                <CardTitle>Creator Community</CardTitle>
-                <CardDescription>
-                  Join a vibrant network of photographers, filmmakers, and rental professionals sharing knowledge and
-                  opportunities.
-                </CardDescription>
-              </CardHeader>
+            <Card className="bg-card border-border">
+              <CardContent className="p-6">
+                <Users className="h-12 w-12 text-secondary mb-4" />
+                <h3 className="text-xl font-bold mb-2">Community Insights</h3>
+                <p className="text-muted-foreground">
+                  Connect with fellow creators, share experiences, and get recommendations from the community.
+                </p>
+              </CardContent>
             </Card>
-          </div>
-        </div>
-      </section>
 
-      {/* Marketplace Preview */}
-      <section id="marketplace" className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold mb-4">Featured Equipment</h2>
-            <p className="text-xl text-muted-foreground">
-              Discover top-rated gear available for rent from trusted providers
-            </p>
-          </div>
+            <Card className="bg-card border-border">
+              <CardContent className="p-6">
+                <Zap className="h-12 w-12 text-secondary mb-4" />
+                <h3 className="text-xl font-bold mb-2">Smart Comparisons</h3>
+                <p className="text-muted-foreground">
+                  Compare equipment side-by-side with intelligent filtering and recommendation algorithms.
+                </p>
+              </CardContent>
+            </Card>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              {
-                name: "Canon EOS R5",
-                category: "Mirrorless Camera",
-                price: "$89/day",
-                rating: 4.9,
-                location: "Los Angeles, CA",
-                image: "/canon-eos-r5-camera.jpg",
-              },
-              {
-                name: "Sony FX6 Cinema Camera",
-                category: "Cinema Camera",
-                price: "$245/day",
-                rating: 4.8,
-                location: "New York, NY",
-                image: "/sony-fx6-cinema-camera.jpg",
-              },
-              {
-                name: "ARRI Alexa Mini LF",
-                category: "Professional Cinema",
-                price: "$890/day",
-                rating: 5.0,
-                location: "Atlanta, GA",
-                image: "/arri-alexa-mini-lf-camera.jpg",
-              },
-            ].map((item, index) => (
-              <Card key={index} className="overflow-hidden card-gradient hover:shadow-lg transition-all duration-300 group">
-                <div className="aspect-video bg-muted relative overflow-hidden">
-                  <img src={item.image || "/placeholder.svg"} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                </div>
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold text-lg">{item.name}</h3>
-                    <Badge variant="secondary" className="glow-effect">{item.category}</Badge>
-                  </div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <span className="text-sm font-medium">{item.rating}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                    <MapPin className="h-4 w-4" />
-                    {item.location}
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-2xl font-bold gradient-text">{item.price}</span>
-                    <Button size="sm" className="glow-effect">View Details</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+            <Card className="bg-card border-border">
+              <CardContent className="p-6">
+                <Target className="h-12 w-12 text-secondary mb-4" />
+                <h3 className="text-xl font-bold mb-2">Project Planning</h3>
+                <p className="text-muted-foreground">
+                  Plan your shoots with equipment recommendations based on your specific project requirements.
+                </p>
+              </CardContent>
+            </Card>
 
-          <div className="text-center mt-12">
-            <Button size="lg" variant="outline" asChild>
-              <Link href="/explore">
-                View All Equipment
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
+            <Card className="bg-card border-border">
+              <CardContent className="p-6">
+                <Camera className="h-12 w-12 text-secondary mb-4" />
+                <h3 className="text-xl font-bold mb-2">Latest Updates</h3>
+                <p className="text-muted-foreground">
+                  Stay current with the latest equipment releases, firmware updates, and industry trends.
+                </p>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 relative overflow-hidden">
-        <div className="absolute inset-0 gradient-bg" />
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/10 to-primary/20" />
-        <div className="container mx-auto px-4 text-center relative">
-          <h2 className="text-3xl lg:text-4xl font-bold mb-6 gradient-text">Ready to Elevate Your Creative Projects?</h2>
-          <p className="text-xl mb-8 max-w-2xl mx-auto opacity-90">
-            Join thousands of visual creators who trust Altoscope for their equipment needs.
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-primary/5">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to elevate your creative workflow?</h2>
+          <p className="text-xl text-muted-foreground mb-8">
+            Join thousands of visual creators who trust Altoscope for their equipment research and education.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" variant="secondary" className="text-lg px-8 glow-effect">
+            <Button size="lg" className="bg-secondary text-secondary-foreground hover:bg-secondary/90">
               Start Exploring
             </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="text-lg px-8 border-primary/50 text-foreground hover:bg-primary/10 bg-transparent backdrop-blur-sm"
-            >
-              List Your Equipment
+            <Button variant="outline" size="lg">
+              View Pricing
             </Button>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border/50 py-12 bg-muted/20">
-        <div className="container mx-auto px-4">
+      <footer className="border-t border-border py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
-                <Camera className="h-6 w-6 text-primary glow-effect" />
-                <span className="text-xl font-bold gradient-text">Altoscope</span>
+                <Camera className="h-6 w-6 text-secondary" />
+                <span className="text-lg font-bold">Altoscope</span>
               </div>
               <p className="text-muted-foreground">
-                Empowering visual creators with the right tools for every project.
+                Empowering visual creators through comprehensive camera equipment knowledge and education.
               </p>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Platform</h4>
               <ul className="space-y-2 text-muted-foreground">
                 <li>
-                  <Link href="#" className="hover:text-foreground">
-                    Browse Equipment
-                  </Link>
+                  <a href="#" className="hover:text-foreground transition-colors">
+                    Database
+                  </a>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-foreground">
-                    Rent Gear
-                  </Link>
+                  <a href="#" className="hover:text-foreground transition-colors">
+                    Guides
+                  </a>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-foreground">
-                    List Equipment
-                  </Link>
+                  <a href="#" className="hover:text-foreground transition-colors">
+                    Comparisons
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-foreground transition-colors">
+                    Reviews
+                  </a>
                 </li>
               </ul>
             </div>
@@ -257,44 +220,54 @@ export default function HomePage() {
               <h4 className="font-semibold mb-4">Community</h4>
               <ul className="space-y-2 text-muted-foreground">
                 <li>
-                  <Link href="#" className="hover:text-foreground">
-                    Creator Stories
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-foreground">
-                    Equipment Reviews
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-foreground">
+                  <a href="#" className="hover:text-foreground transition-colors">
                     Forums
-                  </Link>
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-foreground transition-colors">
+                    Contributors
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-foreground transition-colors">
+                    Events
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-foreground transition-colors">
+                    Newsletter
+                  </a>
                 </li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-4">Support</h4>
+              <h4 className="font-semibold mb-4">Company</h4>
               <ul className="space-y-2 text-muted-foreground">
                 <li>
-                  <Link href="#" className="hover:text-foreground">
-                    Help Center
-                  </Link>
+                  <a href="#" className="hover:text-foreground transition-colors">
+                    About
+                  </a>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-foreground">
-                    Contact Us
-                  </Link>
+                  <a href="#" className="hover:text-foreground transition-colors">
+                    Careers
+                  </a>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-foreground">
-                    Safety Guidelines
-                  </Link>
+                  <a href="#" className="hover:text-foreground transition-colors">
+                    Contact
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-foreground transition-colors">
+                    Privacy
+                  </a>
                 </li>
               </ul>
             </div>
           </div>
-          <div className="border-t mt-8 pt-8 text-center text-muted-foreground">
+          <div className="border-t border-border mt-8 pt-8 text-center text-muted-foreground">
             <p>&copy; 2024 Altoscope. All rights reserved.</p>
           </div>
         </div>

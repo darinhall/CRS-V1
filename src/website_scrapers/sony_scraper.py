@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 from playwright.sync_api import sync_playwright
 from datetime import datetime
 
+
 '''This is a scraper for the Sony website. It is used to scrape the main sony shop page to find all the items on Sony's website currently for sale.'''
 
 class SonyDataScraper:
@@ -81,7 +82,7 @@ class SonyDataScraper:
             
             # Target specific Sony product pages
             target_urls = [
-                "https://electronics.sony.com/imaging/interchangeable-lens-cameras/c/all-interchangeable-lens-cameras"
+            #    "https://electronics.sony.com/imaging/interchangeable-lens-cameras/c/all-interchangeable-lens-cameras"
             ]
 
             for target_url in target_urls:
@@ -89,7 +90,7 @@ class SonyDataScraper:
                     print(f"Scraping from: {target_url}")
                     
                     # Use the new _scrape_with_load_more method that handles pagination
-                    new_urls = self._scrape_with_load_more(target_url, max_load_more=3)  # Changed back to 3 for Sony
+                    new_urls = self._scrape_with_load_more(target_url, max_load_more=30) 
                     camera_urls.extend(new_urls)
                     
                     print(f"  Found {len(new_urls)} products on {target_url}")
@@ -114,7 +115,7 @@ class SonyDataScraper:
             print(f"Error in find_body_pages: {e}")
             return []
     
-    def _scrape_with_load_more(self, url, max_load_more=10):
+    def _scrape_with_load_more(self, url, max_load_more):
         """Scrape product URLs from a page with comprehensive pagination checking"""
         product_urls = []
         initial_count = 0
@@ -127,8 +128,28 @@ class SonyDataScraper:
                 self.start_browser()
             
             print(f"🌐 Navigating to: {url}")
-            self.page.goto(url, wait_until='domcontentloaded', timeout=30000)
-            time.sleep(3)  # Wait for content to load
+            self.page.goto(url, wait_until='networkidle', timeout=30000)
+            time.sleep(8)  # Wait for content to load
+            
+            # Wait for product elements to be visible (more robust)
+            try:
+                self.page.wait_for_selector('a[href*="/p/"]', timeout=10000)
+                print(f"  ✅ Product links detected on page")
+            except:
+                print(f"  ⚠️  No product links detected with selector, proceeding anyway")
+            
+            # Debug: Check for "Load More" or pagination buttons
+            try:
+                load_more_buttons = self.page.query_selector_all('button:has-text("Load More"), button:has-text("Show More"), [class*="load"], [class*="pagination"]')
+                print(f"  🔍 Found {len(load_more_buttons)} potential load more/pagination elements")
+                
+                # Also check for any buttons with "more" text
+                all_buttons = self.page.query_selector_all('button')
+                more_buttons = [btn for btn in all_buttons if 'more' in btn.text_content().lower()]
+                print(f"  🔍 Found {len(more_buttons)} buttons containing 'more' text")
+                
+            except Exception as e:
+                print(f"  ⚠️  Error checking for load more buttons: {e}")
             
             # Get initial page content
             page_content = self.page.content()
@@ -139,6 +160,32 @@ class SonyDataScraper:
             product_urls.extend(initial_products)
             initial_count = len(initial_products)
             print(f"  📦 Found {initial_count} products on initial page")
+            
+            # Debug: Check total number of /p/ links in HTML
+            all_p_links = soup.find_all('a', href=lambda x: x and '/p/' in x)
+            print(f"  🔍 DEBUG: Total /p/ links found in HTML: {len(all_p_links)}")
+            
+            # Debug: Check for the specific custom-product-grid-item__info class
+            custom_product_items = soup.find_all(class_='custom-product-grid-item__info')
+            print(f"  🔍 DEBUG: Found {len(custom_product_items)} custom-product-grid-item__info elements")
+            
+            # Debug: Check for /imaging/lenses/ links specifically
+            lens_links = soup.find_all('a', href=lambda x: x and '/imaging/lenses/' in x)
+            print(f"  🔍 DEBUG: Found {len(lens_links)} /imaging/lenses/ links")
+            
+            # Debug: Show some sample /p/ links
+            if all_p_links:
+                print(f"  📋 Sample /p/ links found:")
+                for i, link in enumerate(all_p_links[:5]):
+                    href = link.get('href', '')
+                    print(f"    {i+1}. {href}")
+            
+            # Debug: Show some sample /imaging/lenses/ links
+            if lens_links:
+                print(f"  📋 Sample /imaging/lenses/ links found:")
+                for i, link in enumerate(lens_links[:5]):
+                    href = link.get('href', '')
+                    print(f"    {i+1}. {href}")
             
             # First, try URL-based pagination (more reliable)
             print(f"  🔗 Checking URL-based pagination...")
@@ -176,7 +223,7 @@ class SonyDataScraper:
         
         return product_urls
     
-    def _scrape_url_pagination(self, base_url, max_pages=30):
+    def _scrape_url_pagination(self, base_url, max_pages=10):
         """Scrape products using URL-based pagination (?p=2, ?p=3, etc.)"""
         all_products = []
         pages_checked = 0
@@ -194,8 +241,8 @@ class SonyDataScraper:
                 
                 try:
                     # Navigate to the page
-                    self.page.goto(page_url, wait_until='domcontentloaded', timeout=20000)
-                    time.sleep(2)
+                    self.page.goto(page_url, wait_until='networkidle', timeout=20000)
+                    time.sleep(5)
                     
                     # Get page content
                     page_content = self.page.content()
@@ -215,7 +262,7 @@ class SonyDataScraper:
                             print(f"      🔍 DEBUG: All {len(products_on_page)} products were duplicates. Sample: {products_on_page[:2]}")
                             consecutive_empty_pages += 1
                             # Stop if we've had 2 consecutive pages with only duplicates
-                            if consecutive_empty_pages >= 2:
+                            if consecutive_empty_pages >= 5:
                                 print(f"      🛑 Stopping pagination after {consecutive_empty_pages} consecutive pages with only duplicates")
                                 break
                         else:
@@ -225,7 +272,7 @@ class SonyDataScraper:
                         print(f"      ⚠️  No products found on page {page_num} (consecutive empty: {consecutive_empty_pages})")
                         
                         # Stop if we've had 3 consecutive empty pages
-                        if consecutive_empty_pages >= 3:
+                        if consecutive_empty_pages >= 5:
                             print(f"      🛑 Stopping pagination after {consecutive_empty_pages} consecutive empty pages")
                             break
                         
@@ -234,7 +281,7 @@ class SonyDataScraper:
                     print(f"      ❌ Error accessing page {page_num}: {e}")
                     
                     # Stop if we've had 3 consecutive errors
-                    if consecutive_empty_pages >= 3:
+                    if consecutive_empty_pages >= 5:
                         print(f"      🛑 Stopping pagination after {consecutive_empty_pages} consecutive errors")
                         break
                     
@@ -258,8 +305,8 @@ class SonyDataScraper:
         
         try:
             # Navigate to the base URL
-            self.page.goto(url, wait_until='domcontentloaded', timeout=30000)
-            time.sleep(3)
+            self.page.goto(url, wait_until='networkidle', timeout=30000)
+            time.sleep(5)
             
             # Get initial page content
             page_content = self.page.content()
@@ -329,8 +376,13 @@ class SonyDataScraper:
         total_links_checked = 0
         product_links_found = 0
         
-        # Look for Sony-specific product link patterns
+        # Sony base URL for constructing full URLs
+        sony_base = "https://electronics.sony.com"
+        
+        # Look for Sony-specific product link patterns, focusing on the custom-product-grid-item__info class
         product_selectors = [
+            '.custom-product-grid-item__info a[href*="/p/"]',  # Target the specific class you mentioned
+            'a[href*="/imaging/lenses/"]',  # Sony lens product links
             'a[href*="/p/"]',  # Sony uses /p/ for product pages
             'a[class*="product"]',
             'a[class*="item"]',
@@ -344,28 +396,34 @@ class SonyDataScraper:
             for link in links:
                 href = link.get('href')
                 if href:
-                    # Make sure it's a full URL
+                    # Convert relative URLs to full URLs
                     if href.startswith('/'):
-                        full_url = urljoin(base_url, href)
-                    else:
+                        full_url = sony_base + href
+                    elif href.startswith('http'):
                         full_url = href
+                    else:
+                        full_url = urljoin(sony_base, href)
+                    
                     # Only include actual product pages (not filter pages)
                     if '/p/' in full_url and '?' not in full_url and full_url not in product_urls:
                         product_urls.append(full_url)
                         product_links_found += 1
         
-        # Also look for any links that contain the product pattern
+        # Also look for any links that contain the product pattern in the entire page
         all_links = soup.find_all('a', href=True)
         total_links_checked += len(all_links)
         
         for link in all_links:
             href = link.get('href')
-            if href and ('/p/' in href or href.startswith('/p/')):
-                # Make sure it's a full URL
+            if href and ('/p/' in href or href.startswith('/p/') or '/imaging/lenses/' in href):
+                # Convert relative URLs to full URLs
                 if href.startswith('/'):
-                    full_url = urljoin(base_url, href)
-                else:
+                    full_url = sony_base + href
+                elif href.startswith('http'):
                     full_url = href
+                else:
+                    full_url = urljoin(sony_base, href)
+                
                 # Only include actual product pages (not filter pages)
                 if '/p/' in full_url and '?' not in full_url and full_url not in product_urls:
                     product_urls.append(full_url)
@@ -373,6 +431,12 @@ class SonyDataScraper:
         
         # Debug output
         print(f"    🔍 Extracted {product_links_found} product links from {total_links_checked} total links checked")
+        
+        # Additional debugging - show sample URLs found
+        if product_urls:
+            print(f"    📋 Sample product URLs found:")
+            for i, url in enumerate(product_urls[:5]):
+                print(f"      {i+1}. {url}")
         
         return product_urls
 
@@ -562,7 +626,7 @@ class SonyDataScraper:
             
             # Target specific Sony lens pages
             target_urls = [
-                "https://electronics.sony.com/c/lenses"
+                "https://electronics.sony.com/imaging/c/lenses"
             ]
 
             for target_url in target_urls:
@@ -570,7 +634,7 @@ class SonyDataScraper:
                     print(f"Scraping from: {target_url}")
                     
                     # Use the new _scrape_with_load_more method that handles pagination
-                    new_urls = self._scrape_with_load_more(target_url, max_load_more=3)  # Changed back to 3 for Sony
+                    new_urls = self._scrape_with_load_more(target_url, max_load_more=30)
                     lens_urls.extend(new_urls)
                     
                     print(f"  Found {len(new_urls)} products on {target_url}")
@@ -614,7 +678,7 @@ class SonyDataScraper:
                     print(f"Scraping from: {target_url}")
                     
                     # Use the new _scrape_with_load_more method that handles pagination
-                    new_urls = self._scrape_with_load_more(target_url, max_load_more=3)
+                    new_urls = self._scrape_with_load_more(target_url, max_load_more=30)
                     compact_urls.extend(new_urls)
                     
                     print(f"  Found {len(new_urls)} products on {target_url}")
@@ -748,96 +812,8 @@ class SonyDataScraper:
             print(f"Error testing Sony access: {e}")
             return False
 
-    def scrape_website_specs(self, url):
-        """Scrape camera specifications from Sony website using Playwright"""
-        try:
-            # Use Playwright instead of requests to avoid 403 errors
-            if not self.page:
-                self.start_browser()
-            
-            print(f"Scraping specs from: {url}")
-            self.page.goto(url, wait_until='networkidle')
-            time.sleep(2)  # Wait for content to load
-            
-            page_content = self.page.content()
-            soup = BeautifulSoup(page_content, 'html.parser')
-            
-            # Extract basic info
-            product_data = {
-                'url': url,
-                'title': '',
-                'model': '',
-                'type': '',
-                'specifications': {},
-                'images': [],
-                'price': '',
-                'description': ''
-            }
-            
-            # Finding the title of the product
-            title_selectors = ['h1', '.product-title', '.page-title', 'title', '.product-item-name']
-            for selector in title_selectors:
-                title_elem = soup.select_one(selector)
-                if title_elem:
-                    product_data['title'] = title_elem.get_text().strip()
-                    break
-
-            # Look for specifications tables/sections
-            spec_sections = soup.find_all(['table', 'div'], class_=re.compile(r'spec|specification|feature|detail', re.I))
-            
-            for section in spec_sections:
-                # Extract table data
-                rows = section.find_all('tr')
-                for row in rows:
-                    cells = row.find_all(['td', 'th'])
-                    if len(cells) >= 2:
-                        key = cells[0].get_text().strip()
-                        value = cells[1].get_text().strip()
-                        if key and value:
-                            product_data['specifications'][key] = value
-                
-                # Extract list data
-                items = section.find_all('li')
-                for item in items:
-                    text = item.get_text().strip()
-                    if ':' in text:
-                        key, value = text.split(':', 1)
-                        product_data['specifications'][key.strip()] = value.strip()
-            
-            # Look for images
-            img_tags = soup.find_all('img', src=True)
-            for img in img_tags:
-                src = img['src']
-                if src and not src.startswith('data:'):
-                    full_url = urljoin(url, src)
-                    product_data['images'].append(full_url)
-            
-            # Look for price
-            price_selectors = ['.price', '.cost', '[class*="price"]', '[class*="cost"]']
-            for selector in price_selectors:
-                price_elem = soup.select_one(selector)
-                if price_elem:
-                    product_data['price'] = price_elem.get_text().strip()
-                    break
-            
-            # Extract description
-            desc_selectors = ['.description', '.overview', '.product-description', 'p']
-            for selector in desc_selectors:
-                desc_elem = soup.select_one(selector)
-                if desc_elem and len(desc_elem.get_text().strip()) > 50:
-                    product_data['description'] = desc_elem.get_text().strip()[:500]
-                    break
-
-            return product_data
-            
-        except Exception as e:
-            print(f"Error scraping {url}: {e}")
-            return None
-
-    def save_urls_to_json(self, urls, company="sony", category="body"):
+    def save_urls_to_json(self, urls, company="sony", category="lens"):
         """Save discovered URLs to a JSON file for later use"""
-        import json
-        from pathlib import Path
         
         # Create data directory if it doesn't exist
         data_dir = Path("data/url_lists")
@@ -863,8 +839,6 @@ class SonyDataScraper:
     
     def load_urls_from_json(self, company="sony", category="body"):
         """Load URLs from JSON file"""
-        import json
-        from pathlib import Path
         
         filename = f"{company}_{category}_urls.json"
         filepath = Path("data/url_lists") / filename
@@ -909,58 +883,58 @@ if __name__ == "__main__":
             print("✅ Can access Sony website")
             
             # Configuration for bodies
-            body_company = "sony"
-            body_category = "body"
-            body_batch_size = 120  # Process 120 URLs at a time
-            body_start_index = 0  # Start from 0
+            lens_company = "sony"
+            lens_category = "lens"
+            lens_batch_size = 100  # Process 120 URLs at a time
+            lens_start_index = 0  # Start from 0
             
-            print(f"\n=== Body Scraping Configuration ===")
-            print(f"Company: {body_company}")
-            print(f"Category: {body_category}")
-            print(f"Batch size: {body_batch_size}")
-            print(f"Start index: {body_start_index}")
+            print(f"\n=== Lens Scraping Configuration ===")
+            print(f"Company: {lens_company}")
+            print(f"Category: {lens_category}")
+            print(f"Batch size: {lens_batch_size}")
+            print(f"Start index: {lens_start_index}")
             
             # Process Bodies
             print(f"\n{'='*50}")
-            print(f"=== PROCESSING CAMERA BODIES ===")
+            print(f"=== PROCESSING LENSES ===")
             print(f"{'='*50}")
             
             # Try to load existing URLs first
-            print(f"\n=== Loading Existing Body URLs ===")
-            body_urls = scraper.load_urls_from_json(body_company, body_category)
+            print(f"\n=== Loading Existing Lens URLs ===")
+            lens_urls = scraper.load_urls_from_json(lens_company, lens_category)
             
-            if body_urls is None:
+            if lens_urls is None:
                 # If no existing URLs, discover them and save to JSON
-                print(f"\n=== Discovering Body URLs ===")
-                body_urls = scraper.find_body_pages()
-                print(f"Found {len(body_urls)} body URLs")
+                print(f"\n=== Discovering Lens URLs ===")
+                lens_urls = scraper.find_lens_pages()
+                print(f"Found {len(lens_urls)} lens URLs")
                 
-                if body_urls:
-                    print(f"\n=== Saving Body URLs to JSON ===")
-                    scraper.save_urls_to_json(body_urls, body_company, body_category)
+                if lens_urls:
+                    print(f"\n=== Saving Lens URLs to JSON ===")
+                    scraper.save_urls_to_json(lens_urls, lens_company, lens_category)
             
-            if body_urls:
-                print(f"\n=== Processing Body URLs in Batches ===")
-                print(f"Total URLs available: {len(body_urls)}")
+            if lens_urls:
+                print(f"\n=== Processing Lens URLs in Batches ===")
+                print(f"Total URLs available: {len(lens_urls)}")
                 
                 # Process in batches
                 saved_files, next_index = scraper.scrape_in_batches(
-                    body_urls, 
-                    company=body_company, 
-                    category=body_category, 
-                    batch_size=body_batch_size, 
-                    start_index=body_start_index
+                    lens_urls, 
+                    company=lens_company, 
+                    category=lens_category, 
+                    batch_size=lens_batch_size, 
+                    start_index=lens_start_index
                 )
                 
-                print(f"\n📊 Body Batch Summary:")
+                print(f"\n📊 Lens Batch Summary:")
                 print(f"  ✅ Files saved: {len(saved_files)}")
                 print(f"  📊 Next batch index: {next_index}")
-                print(f"  📊 Remaining URLs: {len(body_urls) - next_index}")
+                print(f"  📊 Remaining URLs: {len(lens_urls) - next_index}")
                 
-                if next_index < len(body_urls):
-                    print(f"\n💡 To continue bodies, update body_start_index to {next_index}")
+                if next_index < len(lens_urls):
+                    print(f"\n💡 To continue lenses, update lens_start_index to {next_index}")
                 else:
-                    print(f"\n🎉 All body URLs processed!")
+                    print(f"\n🎉 All lens URLs processed!")
             
             print(f"\n{'='*50}")
             print(f"=== SCRAPING COMPLETE ===")

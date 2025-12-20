@@ -1,0 +1,197 @@
+{
+  "metadata": {
+    "total_cameras": 13,
+    "total_attributes": 223,
+    "enrichment_guidelines": [
+      "Use exact values from Canon specifications when available",
+      "Maintain consistent formatting across all cameras",
+      "Use \"N/A\" for truly unavailable specifications",
+      "Use \"Not specified\" for unknown values",
+      "Preserve existing JSON structure"
+    ]
+  },
+  "enrichment_data": {
+    "EOS R1": {
+      "af_work_range": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      },
+      "focusing_brightness_range_video": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      }
+    },
+    "EOS R3": {
+      "af_work_range": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      },
+      "focusing_brightness_range_video": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      }
+    },
+    "EOS R5": {
+      "af_work_range": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      },
+      "focusing_brightness_range_video": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      }
+    },
+    "EOS R5 MARK II": {
+      "af_work_range": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      },
+      "focusing_brightness_range_video": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      }
+    },
+    "EOS R6 MARK II": {
+      "af_work_range": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      },
+      "focusing_brightness_range_video": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      }
+    },
+    "EOS R7": {
+      "af_work_range": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      },
+      "focusing_brightness_range_video": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      }
+    },
+    "EOS R8": {
+      "af_work_range": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      },
+      "focusing_brightness_range_video": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      }
+    },
+    "EOS R10": {
+      "af_work_range": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      },
+      "focusing_brightness_range_video": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      }
+    },
+    "EOS R50": {
+      "af_work_range": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      },
+      "focusing_brightness_range_video": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      }
+    },
+    "EOS R100": {
+      "af_work_range": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      },
+      "focusing_brightness_range_video": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      }
+    },
+    "EOS R5 C": {
+      "af_work_range": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      },
+      "focusing_brightness_range_video": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      }
+    },
+    "EOS R50 V BODY": {
+      "af_work_range": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      },
+      "focusing_brightness_range_video": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      }
+    },
+    "EOS RP": {
+      "af_work_range": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      },
+      "focusing_brightness_range_video": {
+        "current_value": "",
+        "suggested_value": "N/A",
+        "source": "manual_research",
+        "notes": ""
+      }
+    }
+  }
+}

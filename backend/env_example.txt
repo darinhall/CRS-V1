@@ -1,7 +1,0 @@
-# Direct PostgreSQL Connection (Required for the pipeline)
-# Replace [YOUR-PASSWORD] with your actual DB password (not your Supabase login password)
-DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.imyolucrrcrxdwmnvemo.supabase.co:5432/postgres
-
-# Optional: Supabase Client Config (If we decide to use the client later for other features)
-SUPABASE_URL=https://imyolucrrcrxdwmnvemo.supabase.co
-SUPABASE_KEY=your-anon-or-service-role-key

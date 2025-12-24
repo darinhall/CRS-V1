@@ -16,7 +16,8 @@ class SpecMapperService:
         try:
             with self.conn.cursor() as cur:
                 # Load Definitions
-                cur.execute("SELECT id, display_name, data_type, unit FROM spec_definitions")
+                # NOTE: schema uses singular table names (spec_definition/spec_mapping)
+                cur.execute("SELECT id, display_name, data_type, unit FROM spec_definition")
                 for row in cur.fetchall():
                     self.definitions[row[0]] = {
                         "name": row[1],
@@ -27,7 +28,7 @@ class SpecMapperService:
                 # Load Mappings
                 cur.execute("""
                     SELECT spec_definition_id, extraction_pattern, context_pattern, priority 
-                    FROM spec_mappings 
+                    FROM spec_mapping 
                     ORDER BY priority DESC
                 """)
                 # Store as list of dicts for iteration

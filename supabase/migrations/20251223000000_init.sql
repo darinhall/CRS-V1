@@ -149,20 +149,20 @@ CREATE TABLE IF NOT EXISTS product_spec_matrix (
 );
 
 -- Indexes
-CREATE INDEX idx_product_brand ON product(brand_id);
-CREATE INDEX idx_product_category ON product(category_id);
-CREATE INDEX idx_product_slug ON product(slug);
-CREATE INDEX idx_product_raw_data ON product USING GIN (raw_data);
+CREATE INDEX IF NOT EXISTS idx_product_brand ON product(brand_id);
+CREATE INDEX IF NOT EXISTS idx_product_category ON product(category_id);
+CREATE INDEX IF NOT EXISTS idx_product_slug ON product(slug);
+CREATE INDEX IF NOT EXISTS idx_product_raw_data ON product USING GIN (raw_data);
 
-CREATE INDEX idx_product_spec_product ON product_spec(product_id);
-CREATE INDEX idx_product_spec_definition ON product_spec(spec_definition_id);
-CREATE INDEX idx_product_spec_numeric ON product_spec(numeric_value);
-CREATE INDEX idx_spec_mapping_pattern ON spec_mapping(extraction_pattern);
+CREATE INDEX IF NOT EXISTS idx_product_spec_product ON product_spec(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_spec_definition ON product_spec(spec_definition_id);
+CREATE INDEX IF NOT EXISTS idx_product_spec_numeric ON product_spec(numeric_value);
+CREATE INDEX IF NOT EXISTS idx_spec_mapping_pattern ON spec_mapping(extraction_pattern);
 
-CREATE INDEX idx_product_spec_matrix_product ON product_spec_matrix(product_id);
-CREATE INDEX idx_product_spec_matrix_definition ON product_spec_matrix(spec_definition_id);
-CREATE INDEX idx_product_spec_matrix_numeric ON product_spec_matrix(numeric_value);
-CREATE INDEX idx_product_spec_matrix_dims ON product_spec_matrix USING GIN (dims);
+CREATE INDEX IF NOT EXISTS idx_product_spec_matrix_product ON product_spec_matrix(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_spec_matrix_definition ON product_spec_matrix(spec_definition_id);
+CREATE INDEX IF NOT EXISTS idx_product_spec_matrix_numeric ON product_spec_matrix(numeric_value);
+CREATE INDEX IF NOT EXISTS idx_product_spec_matrix_dims ON product_spec_matrix USING GIN (dims);
 
 -- Trigger to update updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -173,10 +173,19 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
-CREATE TRIGGER update_product_updated_at
-    BEFORE UPDATE ON product
-    FOR EACH ROW
-    EXECUTE PROCEDURE update_updated_at_column();
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_trigger
+        WHERE tgname = 'update_product_updated_at'
+    ) THEN
+        CREATE TRIGGER update_product_updated_at
+            BEFORE UPDATE ON product
+            FOR EACH ROW
+            EXECUTE PROCEDURE update_updated_at_column();
+    END IF;
+END $$;
 
 -- ------------------------------------------------------------
 -- Other Schemas

@@ -1,165 +1,263 @@
-## Spec pipeline implementation plan (core + product specializations)
+## Spec pipeline implementation plan (core + plugin specializations)
 
 This document is the **master implementation plan** for finishing `backend/src/agents/spec_pipeline/` into a scalable ingestion system.
 
 It is intentionally aligned with:
 
 - the DB-first model in `backend/src/agents/spec_pipeline/format.md`
-- the existing Playwright scaffolding in `backend/src/agents/spec_pipeline/core/discovery_agent.py` and `backend/src/agents/spec_pipeline/core/extraction_agent.py`
-- the stronger Canon crawling patterns in `src/website_scrapers/canon_scraper.py`
+- the robust Canon crawling patterns in `src/website_scrapers/canon_scraper.py`
 
-This is written for **iteration speed** first (hardcoded config files), then production hardening.
+This is written for **iteration speed** first, while keeping an obvious path to scaling across **many brands** and **many product types**.
+
+---
+
+## Short “why we changed” note (migration)
+
+We moved away from “6 files per brand per product type” (e.g. `canon_discovery.py`, `canon_extractor.py`, …) because that explodes into hundreds of tiny modules and makes refactors painful.
+
+Instead we use a **hybrid model** + **minimal plugin modules**:
+
+- **Product type first** (cameras vs lenses behave differently)
+- **Brand plugins inside that type** (Canon camera ≠ Sony camera)
+- **One `plugin.py` per brand+type** (start minimal; split later only if needed)
 
 ---
 
 ## Guiding principles (non-negotiables)
 
 - **Contract-first**: every stage emits the shapes described in `format.md` (Discovery → Extraction → Normalization → Validation → Persistence).
-- **Deterministic extraction** first: HTML/PDF parsing should be tools + parsers. LLMs are reserved for ambiguous mapping and review assistance.
+- **Deterministic extraction first**: HTML/PDF parsing should be tools + parsers. LLMs are reserved for ambiguous mapping and review assistance.
 - **DB rules before LLM**: use `spec_mapping` (DB table) to map raw keys → `spec_definition`. LLM proposes new mappings only when no rule matches.
 - **Never guess**: if a value cannot be verified from a source artifact, do not fabricate it; emit a TODO/flag with low confidence.
 - **Matrix/table specs** must go into `product_spec_matrix` (plus a parent `product_spec` + provenance JSONB).
 
 ---
 
-## Target folder structure
+## Folder taxonomy (hybrid model)
 
-### `spec_pipeline/core/` (shared infrastructure)
+### 1) `spec_pipeline/core/` (shared infrastructure)
 
-Create these modules (some already exist; some are TODO):
+Core holds stable contracts + shared primitives:
 
-- `contracts.py`
-  - dataclasses/pydantic models for the agent output contract (the JSON shapes from `format.md`)
-  - validation helpers: “is this output contract-valid?”
+- discovery primitives (pagination, filtering, output shape validation)
+- extraction primitives
+- registry/loader for “which plugin do I run?”
 
-#### Extraction layer (keep it simple: 2 files to start)
+### 2) `spec_pipeline/product/<type>/<brand>/` (brand+type plugins)
 
-Start with just **two core files**:
+This is where most implementation lives.
 
-- `discovery.py`
-  - URL discovery + pagination + bot avoidance + URL inventory JSON output
-  - implement multiple classes inside this file as needed (e.g., `CanonDiscovery`, `SonyDiscovery`)
+Example:
 
-- `extraction.py`
-  - product page extraction (HTML) + PDF link detection + (later) PDF table extraction
-  - implement multiple classes inside this file as needed (e.g., `CanonProductExtractor`, `PdfExtractor`)
+- `spec_pipeline/product/camera/canon/plugin.py`
+- `spec_pipeline/product/camera/sony/plugin.py`
+- `spec_pipeline/product/lens/canon/plugin.py`
 
-This keeps iteration fast while still separating concerns.
+Start minimal: **one file per brand+type**.
+When (and only when) the plugin grows too large, split into `discovery.py`, `extractor.py`, etc. inside that brand folder.
 
-**Important:** even with only two files, keep functions/classes separated by concern internally:
+### 3) Optional `spec_pipeline/brand/<brand>/` (shared brand helpers)
 
-- discovery ≠ extraction
-- web extraction ≠ pdf extraction ≠ ocr fallback (can live in the same file as separate classes)
+Only introduce this when you find real cross-type reuse for a brand, e.g.:
 
-Later refactor option (only if it grows too big): split into `extractors/` package modules (`web.py`, `pdf.py`, `ocr.py`).
-
-- `mappers.py`  **(new)**
-  - DB rule mapping (loads `spec_mapping` + `spec_definition`)
-  - LLM fallback to propose new mappings (creates review suggestions, does not auto-commit)
-  - emits **Normalization output** records
-
-- `validators.py`  **(new / merge with existing `validator.py`)**
-  - JSONSchema validation (structure)
-  - semantic validation (units, ranges, impossible values)
-  - matrix completeness checks (e.g., expected aspect ratio columns exist)
-  - emits **Validation output**
-
-- `persistence.py`  **(new)**
-  - DB upsert routines (psycopg2):
-    - upsert product by slug
-    - upsert specs by `(product_id, spec_definition_id)`
-    - upsert matrix cells by `(product_id, spec_definition_id, dims)`
-  - emits **Persistence output**
-
-- `orchestrator.py`  **(new)**
-  - simple stage runner: extract → normalize → validate → persist
-  - optional enrichment stage behind config flag
-  - metrics + “review queue” collection
-
-- `discovery_agent.py`  **(exists)**
-  - keep, but upgrade to Canon-grade discovery logic using patterns from `canon_scraper.py`
-
-- `extraction_agent.py`  **(exists)**
-  - keep, but refactor parsing into strategy objects under `extractors.py`
-
-- `utils.py`  (exists, currently empty)
-  - shared helpers: slugify, retry/backoff, timing, structured logging, HTML cleanup
-
-### `spec_pipeline/product/<type>/` (product-specific overrides)
-
-Each product type is a thin specialization layer (do NOT re-implement the 5 stages):
-
-- `taxonomy.py`
-  - canonical sections + tier-1 keys for UI (filters/compare/graphs)
-  - section ordering rules
-
-- `extractor.py`
-  - manufacturer-specific DOM selectors/table parsers unique to this product type
-  - PDF table parsers for this type (matrix/kv tables)
-
-- `mappings.py`
-  - seedable mapping rules/synonyms
-  - optionally exports a function that writes `spec_mapping` rules into DB (or generates SQL)
-
-- `validators.py`
-  - type-specific semantic checks (e.g., cameras: shutter speed constraints; lenses: focal length ranges)
-
-- `pipeline.py`
-  - factory that wires core orchestrator + product-specific config into a runnable pipeline object
+- Canon “shop client” / cookie logic shared by camera and lens discovery
 
 ---
 
-## Runner workflow (hardcoded configs first)
+## Minimal plugin contract (initial)
 
-### Why hardcoded configs for iteration
+Each `plugin.py` should export:
 
-You want fast iteration on ingestion logic. Start with simple “edit config file, run pipeline” flows.
-Later you can add CLI arguments and/or environment toggles.
-
-### Add a single runner
-
-Create one entrypoint file (recommended location):
-
-- `backend/main.py` (or `backend/scripts/run.py`)
-
-Runner responsibilities only:
-
-- load `.env`
-- choose local vs cloud DB URL
-- open psycopg2 connection
-- pick a product pipeline factory (camera/lens/tripod)
-- call `pipeline.run(config)`
-
-Runner should NOT:
-
-- contain scraping logic
-- contain mapping logic
-- contain SQL upsert statements (those belong in `persistence.py`)
-
-### Hardcoded config files
-
-Add a folder:
-
-- `backend/src/agents/spec_pipeline/config/`
-
-And create files like:
-
-- `camera_canon_dev.py`
-  - brand slug, category slug
-  - listing URLs
-  - product URL pattern
-  - max products to process
-  - headless toggle
-  - feature flags:
-    - enable_enrichment
-    - enable_llm_fallback_mapping
-    - save_raw_html
-    - save_pdf_assets
-    - pdf_policy (see below)
-
-This keeps early iteration simple while your pipeline stabilizes.
+- `BRAND_SLUG`: `str`
+- `PRODUCT_TYPE`: `str`
+- `DISCOVERY_CONFIG`: `DiscoveryConfig` (hardcoded dev config for now)
+- optional future exports:
+  - `extract(product_url) -> ExtractionOutput`
+  - `normalize(extraction) -> NormalizationOutput`
+  - `validate(records) -> ValidationOutput`
+  - `persist(records) -> PersistenceOutput`
 
 ---
+
+## Runner workflow (hardcoded default + CLI overrides)
+
+We support **both**:
+
+- **Hardcoded default**: fastest dev loop (no flags required)
+- **CLI overrides**: scalable (same runner can execute any plugin)
+
+Important: runner selection style is **separate** from Supabase migration workflow.
+Migrations are for schema/baseline seeds; the runner is for runtime ingestion.
+
+---
+
+## Discovery-only data flow (today)
+
+```mermaid
+flowchart TD
+  Runner[backend/scripts/run.py] -->|"defaults_or_cli"| Registry[core/registry.py]
+  Registry --> Plugin[product/camera/canon/plugin.py]
+  Plugin --> DiscoveryCore[core/discovery.py]
+  DiscoveryCore --> UrlInventory[data/url_lists/canon_camera_urls.json]
+```
+
+---
+
+## Current implementation status (what we built so far)
+
+This section documents the **exact working pipeline** we implemented for Canon mirrorless cameras, including where files are written and how the DB-driven mapping loop improves over time.
+
+### Canon camera plugin entrypoint
+
+- Plugin: `backend/src/agents/spec_pipeline/product/camera/canon/plugin.py`
+- It currently supports three runnable stages via `backend/scripts/run.py`:
+  - `--stage discovery`
+  - `--stage extraction`
+  - `--stage normalize`
+
+### Stage 1: Discovery (URL inventory JSON)
+
+**Code**
+- Discovery implementation: `backend/src/agents/spec_pipeline/core/discovery.py`
+- Canon plugin config: `DISCOVERY_CONFIG` in `product/camera/canon/plugin.py`
+- Registry: `backend/src/agents/spec_pipeline/core/registry.py`
+
+**Filters implemented**
+- include `/shop/p/` only
+- exclude query strings (`?`) and refurbished
+- strip URL fragments (e.g. `#toreviews`) for dedupe
+- exclude slug substrings:
+  - `kit`
+  - `with-cropping-guide-firmware`
+  - `with-stop-motion-animation-firmware`
+
+**Output**
+- `data/url_lists/canon_camera_urls.json`
+
+**Run**
+```bash
+python3 backend/scripts/run.py --stage discovery
+```
+
+### Stage 2: Extraction (HTML → manufacturer_sections)
+
+**Code**
+- Extractor: `backend/src/agents/spec_pipeline/core/extraction.py`
+- Canon extraction config: `EXTRACTION_CONFIG` in `product/camera/canon/plugin.py`
+
+**Inputs**
+- For Canon, we prefer your on-disk HTML cache:
+  - reads `data/company_product/canon/raw_html/{slug}.html`
+  - `cache_only=true` means “do not hit the network if missing”
+
+**Outputs**
+- Extraction JSON:
+  - `data/company_product/canon/processed_data/camera/extractions.json`
+- Optional fetched HTML artifact folder (only used if cache fallback is enabled):
+  - `data/company_product/canon/processed_data/camera/raw_html/`
+
+**PDF links captured**
+- If a spec attribute contains a PDF link, extraction stores:
+  - `context.pdf_url`
+
+**Completeness heuristics**
+- Each item includes `completeness` (sections/attributes/tables/pdf_urls_found + `needs_pdf` flag).
+  - This is used to identify products where Canon HTML is incomplete or absent.
+
+**Run**
+```bash
+python3 backend/scripts/run.py --stage extraction
+```
+
+### Product documents: persist PDF URLs as rows (Option B)
+
+We store PDF URLs in a dedicated table so they’re queryable and trackable (download/parse status).
+
+**DB**
+- Table: `product_document`
+- Migration: `supabase/migrations/20251228000000_add_product_document.sql`
+- Schema mirror: `backend/db/schema.sql`
+
+**Import**
+- Importer script: `backend/scripts/import_documents_from_extractions.py`
+
+Run (local example):
+```bash
+export DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+python3 backend/scripts/import_documents_from_extractions.py
+```
+
+### Stage 3: Normalization + Mapping (DB-driven)
+
+**Code**
+- Normalizer: `backend/src/agents/spec_pipeline/core/normalization.py`
+- Text cleanup (display-facing): `backend/src/agents/spec_pipeline/core/text_normalizer.py`
+- Mapping engine: `backend/src/services/spec_mapper.py`
+
+**Important policies**
+- Preserve `raw_value` verbatim for provenance.
+- Compute a cleaned `spec_value` for UI display (bullet/spacing normalization).
+- Do not treat PDF links as specs:
+  - they are emitted as `documents[]` in normalized output
+  - and persisted into `product_document` via importer
+- Table placeholders remain as `table_records[]` for now; matrix conversion is a later milestone.
+  - Exception: we now convert the Canon **Still Image \"File Size\"** table into `matrix_records[]` + `matrix_cells[]` as the first concrete table pipeline.
+
+**Output**
+- `data/company_product/canon/processed_data/camera/normalized.json`
+- Each product includes `run_summary` counts:
+  - mapped/unmapped/tables/documents
+- Each product also includes:
+  - `extraction` (raw_html_path, extraction errors, completeness)
+  - `needs_pdf` + `needs_pdf_reasons`
+- A PDF queue is generated for manual download:
+  - `data/company_product/canon/processed_data/camera/pdf_queue.json`
+
+#### Table pipeline (first implementation): Still Image \"File Size\" table → matrix_records
+
+We convert the Canon HTML table labeled **"File Size"** (under "Recording System") into a matrix-shaped record:
+
+- `normalized_key = still_image_file_size_table`
+- `matrix_cells[]` dims: `format_group`, `quality`
+- `numeric_value` stores file size in MB when the cell is a single numeric (e.g., `8.3`)
+- `value_text` preserves the other table columns (`possible_shots`, `max_burst`) and the original file-size cell text
+
+Note: some Canon rows express file size like `27.5 + 8.3`. For v1 we keep the full expression in `value_text.file_size_cell` and set `numeric_value` to the first numeric token (so we never lose information while keeping a usable numeric).
+
+This produces a `matrix_records[]` entry in `normalized.json` and marks the original table record with `converted_to_matrix=true`. Later this will persist into `product_spec_matrix`.
+
+**Run**
+```bash
+export DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+python3 backend/scripts/run.py --stage normalize
+```
+
+### HTML inconsistency handling (Canon reality)
+
+Canon’s shop pages are not consistent: some products may have **no `tech-spec-data` block** even though a PDF exists.
+
+We handle this by:
+
+- adding extraction `completeness` metrics (section/attribute counts) + `needs_pdf`
+- propagating those fields into normalized output
+- generating `pdf_queue.json` when `needs_pdf=true` and a PDF URL exists
+
+This keeps the pipeline moving without blocking on PDF extraction implementation.
+
+### Mapping iteration loop (how unmapped drops over time)
+
+Mappings live in the DB table `spec_mapping`. The workflow is:
+- run normalize
+- inspect `unmapped`
+- add context-aware mapping rules as migrations
+- reset/apply migrations
+- re-run normalize and re-check counts
+
+**Migration we added for Canon camera label variants**
+- `supabase/migrations/20251228002000_seed_spec_mapping_canon_camera.sql`
+
+**Note on regex escaping**
+- We normalize double-backslashes when compiling regex in Python so the same patterns work when seeded via SQL.
 
 ## Step-by-step implementation plan (phased)
 
@@ -215,6 +313,24 @@ Work required:
     - extract header row(s)
     - extract cell grid
     - emit as `tables[]` in the extraction output
+
+#### Product documents (PDF links) — store as rows, not strings
+
+When the Canon site exposes links like **“View Full Technical Specs PDF”**, treat those as first-class assets.
+
+- Extraction should capture the link URL (e.g. `context.pdf_url`) alongside the raw key/value pair.
+- Persist discovered document URLs into a dedicated table:
+  - `product_document`
+    - `product_id` (optional FK, fill later)
+    - `brand_slug`, `product_type`, `product_slug`
+    - `document_kind` (e.g. `technical_specs_pdf`)
+    - `url`, `source_url`, `status`, timestamps, `raw_metadata`
+
+Suggested workflow:
+
+- Run extraction
+- Run importer `backend/scripts/import_documents_from_extractions.py` to upsert PDF URLs into `product_document`
+- Download PDFs later (manual step), then update `product_document.status` to `downloaded` and set `local_path`
 
 #### Canon-specific PDF policy (as requested)
 

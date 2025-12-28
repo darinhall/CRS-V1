@@ -5,12 +5,12 @@
 -- This schema is designed to store product specifications for a variety of products.
 -- ------------------------------------------------------------
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Supabase-friendly UUID generator
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Brands Table
 CREATE TABLE IF NOT EXISTS brand (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL UNIQUE,
     slug TEXT NOT NULL UNIQUE,
     website_url TEXT,
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS brand (
 
 -- Product Categories Table
 CREATE TABLE IF NOT EXISTS product_category (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     slug TEXT NOT NULL UNIQUE,
     parent_category_id UUID REFERENCES product_category(id),
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS product_category (
 
 -- Spec Sections (Groups like "Image Sensor", "Focus")
 CREATE TABLE IF NOT EXISTS spec_section (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     section_name TEXT NOT NULL,
     category_id UUID REFERENCES product_category(id), -- Optional link to category
     display_order INTEGER DEFAULT 0,
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS spec_section (
 
 -- Spec Definitions (Master taxonomy like "Effective Pixels")
 CREATE TABLE IF NOT EXISTS spec_definition (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     section_id UUID REFERENCES spec_section(id),
     display_name TEXT NOT NULL, -- The canonical name
     normalized_key TEXT NOT NULL UNIQUE, -- For programmatic access (e.g., effective_pixels)
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS spec_definition (
 
 -- Spec Mappings (Translation layer)
 CREATE TABLE IF NOT EXISTS spec_mapping (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     spec_definition_id UUID REFERENCES spec_definition(id) NOT NULL,
     extraction_pattern TEXT NOT NULL, -- Regex or string match
     context_pattern TEXT, -- Regex for section context (e.g. "Focus")
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS spec_mapping (
 
 -- Products Table
 CREATE TABLE IF NOT EXISTS product (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     brand_id UUID REFERENCES brand(id) NOT NULL,
     category_id UUID REFERENCES product_category(id) NOT NULL,
     model TEXT NOT NULL,
@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS product (
 
 -- Product Specs (Normalized Data)
 CREATE TABLE IF NOT EXISTS product_spec (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID REFERENCES product(id) ON DELETE CASCADE NOT NULL,
     spec_definition_id UUID REFERENCES spec_definition(id) NOT NULL,
     
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS product_spec (
 -- Product Spec Matrix (Tabular/Matrix Specs)
 -- Stores "cell" values for specs that are naturally tables (e.g., recording pixels matrix).
 CREATE TABLE IF NOT EXISTS product_spec_matrix (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID REFERENCES product(id) ON DELETE CASCADE NOT NULL,
     spec_definition_id UUID REFERENCES spec_definition(id) ON DELETE CASCADE NOT NULL,
 

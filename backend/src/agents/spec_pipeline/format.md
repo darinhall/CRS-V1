@@ -342,7 +342,9 @@ without changing the downstream normalization + DB writer.
 
 ### 2) Extraction output (raw manufacturer keys grouped by manufacturer sections)
 
-This matches your current Playwright extractor shape (`ExtractionAgent.extract_specs`):
+We standardize on a **list-of-sections** shape because it supports:
+- per-attribute `context` (PDF URLs, table HTML, etc.)
+- keeping table values structured without flattening
 
 ```json
 {
@@ -358,15 +360,21 @@ This matches your current Playwright extractor shape (`ExtractionAgent.extract_s
     "full_name": "Canon EOS R6 Mark III",
     "slug_hint": "eos-r6-mark-iii"
   },
-  "manufacturer_sections": {
-    "Image Sensor": {
-      "Effective Pixels": "Approx. 32.5 million pixels",
-      "Sensor Type": "Full-frame CMOS"
+  "manufacturer_sections": [
+    {
+      "section_name": "Image Sensor",
+      "attributes": [
+        {"raw_key": "Effective Pixels", "raw_value": "Approx. 32.5 million pixels"},
+        {"raw_key": "Sensor Type", "raw_value": "Full-frame CMOS"}
+      ]
     },
-    "Connectivity": {
-      "Transmission Method": "Wi-Fi (IEEE 802.11ac), Bluetooth 5.1"
+    {
+      "section_name": "Connectivity",
+      "attributes": [
+        {"raw_key": "Transmission Method", "raw_value": "Wi-Fi (IEEE 802.11ac), Bluetooth 5.1"}
+      ]
     }
-  },
+  ],
   "raw_html_ref": {
     "stored": false,
     "note": "If stored, provide storage URI + hash for reproducibility"
@@ -377,6 +385,13 @@ This matches your current Playwright extractor shape (`ExtractionAgent.extract_s
 ### 3) Normalization output (DB-ready, typed, canonical)
 
 Normalization emits a list of `spec_records[]`. Each record maps to exactly one `spec_definition.normalized_key`.
+
+Policy:
+- **`raw_value` is preserved verbatim** for provenance/debugging.
+- **`spec_value` is cleaned deterministically** (whitespace + bullet cleanup) for UI display.
+- PDF links are **documents**, not specs: they are routed to `product_document` and surfaced as `documents[]` in normalized output.
+- HTML tables may be represented as `table_records[]` initially.
+  - First implemented conversion: Canon still-image **\"File Size\"** HTML table → `matrix_records[]` + `matrix_cells[]`.
 
 ```json
 {
@@ -411,6 +426,18 @@ Normalization emits a list of `spec_records[]`. Each record maps to exactly one 
         "url": "https://www.usa.canon.com/shop/p/eos-r6-mark-iii",
         "section": "Connectivity",
         "label": "GPS"
+      }
+    }
+  ],
+  "documents": [
+    {
+      "document_kind": "technical_specs_pdf",
+      "url": "https://www.usa.canon.com/.../some-tech-specs.pdf",
+      "source": {
+        "type": "web",
+        "url": "https://www.usa.canon.com/shop/p/eos-r6-mark-iii",
+        "section": "View Full Technical Specs PDF",
+        "label": "Techs. Specs. Detailed PDF"
       }
     }
   ],
@@ -575,3 +602,9 @@ Goal: replace the ad-hoc “LLM returns prose” behavior with deterministic too
 - add a normalized “list item” table for filterable lists (optional)
 - materialized views for performance (only when needed)
 - embeddings/text-search “product doc” view for LLM retrieval (optional)
+
+## General Thoughts
+- using `discovery_agent.py` and `extraction_agent.py` as core classes for the extraction process
+- having each folder separate by product type (camera, lens, tripod, bags & cases, drones & aerial, etc.)
+- in each folder, there will be the following: init.py, product type specific agents (tailored queries or workflow for specific expected attribute keys and values), validators used to both secure data validity and agentically enhance the data if it is not found, and a file for json mappings 
+- agents will also have a config file that allows 

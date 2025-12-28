@@ -9,6 +9,7 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 from playwright.sync_api import sync_playwright
 from datetime import datetime
+import argparse
 
 
 '''This is a scraper for the Canon website. It is used to scrape the main canon shop page to find all the items on Canon's website currently for sale.'''
@@ -195,6 +196,8 @@ class CanonDataScraper:
 
     def save_product_html(self, url, company="canon", category="body", max_retries=3):
         """Save the HTML of a product page to a local file with retry logic and bot detection avoidance"""
+        # Normalize away fragments (e.g. #toreviews)
+        url = (url or "").split("#")[0]
         for attempt in range(max_retries):
             try:
                 # Create output directory if it doesn't exist
@@ -259,6 +262,36 @@ class CanonDataScraper:
                     print(f"  ❌ Failed to save {url} after {max_retries} attempts")
                     return None
         
+        return None
+
+    def load_url_inventory(self, inventory_path: str):
+        """
+        Load URLs from the spec_pipeline discovery JSON file, e.g.:
+          data/url_lists/canon_camera_urls.json
+
+        Returns:
+          (urls, metadata_dict)
+        """
+        p = Path(inventory_path)
+        if not p.exists():
+            raise FileNotFoundError(f"URL inventory not found: {inventory_path}")
+        data = json.loads(p.read_text(encoding="utf-8"))
+        urls = data.get("urls", [])
+        return urls, data
+
+    def find_url_by_slug(self, urls, slug: str):
+        """
+        Find a URL whose last path segment equals `slug`.
+        """
+        target = (slug or "").strip().lower()
+        for u in urls:
+            try:
+                u_norm = (u or "").split("#")[0]
+                path_slug = (urlparse(u_norm).path or "").rstrip("/").split("/")[-1].lower()
+                if path_slug == target:
+                    return u_norm
+            except Exception:
+                continue
         return None
 
     def save_all_product_html(self, urls, company="canon", category="body", start_from_index=0):
@@ -862,79 +895,28 @@ class CanonDataScraper:
 
 
 if __name__ == "__main__":
-    scraper = CanonDataScraper()  # This calls __init__ automatically
-    
+    parser = argparse.ArgumentParser(description="Canon scraper utilities")
+    parser.add_argument("--url-inventory", default="data/url_lists/canon_camera_urls.json")
+    parser.add_argument("--slug", default="eos-r6-mark-iii")
+    parser.add_argument("--company", default="canon")
+    parser.add_argument("--category", default="camera")
+    parser.add_argument("--max-retries", type=int, default=3)
+    args = parser.parse_args()
+
+    scraper = CanonDataScraper()
     try:
-        # Test access first
-        print("=== Testing Canon Access ===")
-        if scraper.test_canon_access():
-            print("✅ Can access Canon website")
-            
-            # Configuration for lenses
-            lens_company = "canon"
-            lens_category = "lens"
-            lens_batch_size = 120  # Process 120 URLs at a time
-            lens_start_index = 0  # Start from 0
-            
-            print(f"\n=== Lens Scraping Configuration ===")
-            print(f"Company: {lens_company}")
-            print(f"Category: {lens_category}")
-            print(f"Batch size: {lens_batch_size}")
-            print(f"Start index: {lens_start_index}")
-            
-            # Process Lenses
-            print(f"\n{'='*50}")
-            print(f"=== PROCESSING LENSES ===")
-            print(f"{'='*50}")
-            
-            # Try to load existing URLs first
-            print(f"\n=== Loading Existing Lens URLs ===")
-            lens_urls = scraper.load_urls_from_json(lens_company, lens_category)
-            
-            if lens_urls is None:
-                # If no existing URLs, discover them and save to JSON
-                print(f"\n=== Discovering Lens URLs ===")
-                lens_urls = scraper.find_lens_pages()
-                print(f"Found {len(lens_urls)} lens URLs")
-                
-                if lens_urls:
-                    print(f"\n=== Saving Lens URLs to JSON ===")
-                    scraper.save_urls_to_json(lens_urls, lens_company, lens_category)
-            
-            if lens_urls:
-                print(f"\n=== Processing Lens URLs in Batches ===")
-                print(f"Total URLs available: {len(lens_urls)}")
-                
-                # Process in batches
-                saved_files, next_index = scraper.scrape_in_batches(
-                    lens_urls, 
-                    company=lens_company, 
-                    category=lens_category, 
-                    batch_size=lens_batch_size, 
-                    start_index=lens_start_index
-                )
-                
-                print(f"\n📊 Lens Batch Summary:")
-                print(f"  ✅ Files saved: {len(saved_files)}")
-                print(f"  📊 Next batch index: {next_index}")
-                print(f"  📊 Remaining URLs: {len(lens_urls) - next_index}")
-                
-                if next_index < len(lens_urls):
-                    print(f"\n💡 To continue lenses, update lens_start_index to {next_index}")
-                else:
-                    print(f"\n🎉 All lens URLs processed!")
-            
-            print(f"\n{'='*50}")
-            print(f"=== SCRAPING COMPLETE ===")
-            print(f"{'='*50}")
-            
-        else:
-            print("❌ Cannot access Canon website")
-            
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
-        
+        urls, meta = scraper.load_url_inventory(args.url_inventory)
+        target_url = scraper.find_url_by_slug(urls, args.slug)
+        if not target_url:
+            raise ValueError(f"Slug not found in inventory: {args.slug}")
+
+        print(f"Found URL for slug '{args.slug}': {target_url}")
+        saved = scraper.save_product_html(
+            target_url,
+            company=args.company,
+            category=args.category,
+            max_retries=args.max_retries,
+        )
+        print(f"Saved HTML: {saved}")
     finally:
         scraper.stop_browser()

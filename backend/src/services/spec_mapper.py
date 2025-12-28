@@ -17,12 +17,13 @@ class SpecMapperService:
             with self.conn.cursor() as cur:
                 # Load Definitions
                 # NOTE: schema uses singular table names (spec_definition/spec_mapping)
-                cur.execute("SELECT id, display_name, data_type, unit FROM spec_definition")
+                cur.execute("SELECT id, normalized_key, display_name, data_type, unit FROM spec_definition")
                 for row in cur.fetchall():
                     self.definitions[row[0]] = {
-                        "name": row[1],
-                        "type": row[2],
-                        "unit": row[3]
+                        "normalized_key": row[1],
+                        "name": row[2],
+                        "type": row[3],
+                        "unit": row[4],
                     }
 
                 # Load Mappings
@@ -31,12 +32,21 @@ class SpecMapperService:
                     FROM spec_mapping 
                     ORDER BY priority DESC
                 """)
+
+                def _normalize_pattern(p: str) -> str:
+                    """
+                    Our SQL seeds often contain double-backslashes (e.g. '\\\\s') because they're written
+                    with Postgres in mind. Python's `re` expects single-backslashes (e.g. '\\s').
+                    Normalize here so one ruleset can serve both.
+                    """
+                    return (p or "").replace("\\\\", "\\")
+
                 # Store as list of dicts for iteration
                 self.mappings = [
                     {
                         "def_id": row[0],
-                        "pattern": re.compile(row[1], re.IGNORECASE),
-                        "context": re.compile(row[2], re.IGNORECASE) if row[2] else None,
+                        "pattern": re.compile(_normalize_pattern(row[1]), re.IGNORECASE),
+                        "context": re.compile(_normalize_pattern(row[2]), re.IGNORECASE) if row[2] else None,
                         "priority": row[3]
                     }
                     for row in cur.fetchall()

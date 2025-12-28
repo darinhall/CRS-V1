@@ -39,14 +39,18 @@ This file serves as a historical record of all implementation work completed for
 
 ### Next Task ID: T0380
 
-### [~] T0379: **60% Complete** _(December 28, 2025)_
+### [~] T0379: **95% Complete** _(December 28, 2025)_
 **Canon Camera Spec Mapping Coverage Sprint (DB-driven)**
 
 Objective: reduce `unmapped_count` and map the **top ~200 UI-relevant** Canon camera specs using DB-first `spec_mapping` rules and stable `spec_definition`s.
 
 **Key Achievements:**
 - ✅ **Unmapped Backlog Artifact**: normalization now emits `data/company_product/canon/processed_data/camera/unmapped_report.json` (aggregated + sorted by frequency, with examples).
-- ✅ **Seed Batch 1**: added first Canon-specific mapping migration batch under `supabase/migrations/`.
+- ✅ **Mapping coverage**: reduced Canon mirrorless `unmapped_count` from ~600+ down to ~100s (intentional skips excluded).
+- ✅ **Seed batches**: added multiple Canon-specific mapping migrations under `supabase/migrations/`:
+  - `20251228006000_seed_spec_mapping_canon_camera_batch1.sql` … `20251228014000_seed_spec_mapping_canon_camera_batch8.sql`
+  - Note: if you edit a migration after it has been applied, it will *not* re-run. Create a new “fix” migration (like `20251228008000_*_batch2_fix.sql`) for idempotent backfills.
+- ✅ **Label cleanup**: normalization now cleans obvious HTML artifacts in labels (e.g. `@999br/>`) to prevent duplicate unmapped groups.
 
 **Current Workflow (rinse & repeat):**
 - Run normalize:
@@ -66,6 +70,18 @@ Objective: reduce `unmapped_count` and map the **top ~200 UI-relevant** Canon ca
   - Rationale: these are playback/workflow features, not core product specs for comparison.
 - Canon section noise (map later only if we confirm stable section semantics):
   - `Custom Controls` / `Customizable Dials` when extracted under `Video Calls / Streaming`
+
+### [✓] T0380: **100% Complete** _(December 28, 2025)_
+**Product Image Ingestion (Canon shop gallery → product_image)**
+
+Added support for extracting multiple Canon product image URLs and persisting them to the database as rows.
+
+**Key Achievements:**
+- ✅ **DB table**: added `product_image` via `supabase/migrations/20251228015000_add_product_image.sql`
+- ✅ **Schema mirror**: updated `backend/db/schema.sql`
+- ✅ **Extraction**: Canon cached HTML now yields `images[]` in extraction output (`backend/src/agents/spec_pipeline/core/extraction.py`)
+- ✅ **Normalization**: `images[]` + `images_count` now included in normalized output (`backend/src/agents/spec_pipeline/core/normalization.py`)
+- ✅ **Persistence**: `--stage persist` upserts into `product_image` and reports `images_upserted` (`backend/src/agents/spec_pipeline/core/persistence.py`)
 
 ### [✓] T0378: **100% Complete** _(August 13, 2025)_
 **Canon Data Enrichment System Development**

@@ -1,6 +1,7 @@
 import json
 import logging
 import random
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -184,6 +185,178 @@ class CanonCameraExtractor(BaseExtractor):
 
         return sections
 
+    def _parse_canon_product_images(self, soup: BeautifulSoup, base_url: str) -> List[Dict[str, Any]]:
+        """
+        Extract product image URLs from a Canon shop product page.
+
+        Returns images[] shaped like:
+        [{"url": "...", "kind": "primary|gallery|og", "sort_order": int?, "source": {...}, "raw_metadata": {...}}]
+        """
+        urls: List[str] = []
+        primary_url: Optional[str] = None
+
+        def _add(u: Optional[str]) -> None:
+            if not u:
+                return
+            u2 = urljoin(base_url, u)
+            # canonicalize fragments only (keep query params like fmt=webp-alpha)
+            u2 = _normalize_url(u2)
+            if u2 not in urls:
+                urls.append(u2)
+
+        def _set_primary(u: Optional[str]) -> None:
+            nonlocal primary_url
+            if not u:
+                return
+            u2 = urljoin(base_url, u)
+            u2 = _normalize_url(u2)
+            primary_url = u2
+            _add(u2)
+
+        # 0) Canon gallery placeholder (often the main/primary image)
+        placeholder = soup.select_one("img.gallery-placeholder__image")
+        if placeholder and placeholder.get("src"):
+            _set_primary(placeholder.get("src"))
+
+        # 0b) Active fotorama stage frame (sometimes exposes href to the primary image)
+        active = soup.select_one(".fotorama__stage__frame.fotorama__active")
+        if active is not None:
+            if active.get("href"):
+                _set_primary(active.get("href"))
+            else:
+                active_img = active.select_one("img.fotorama__img")
+                if active_img and active_img.get("src"):
+                    _set_primary(active_img.get("src"))
+
+        # 1) og:image (usually primary)
+        og = soup.find("meta", attrs={"property": "og:image"})
+        if og and og.get("content"):
+            if primary_url is None:
+                _set_primary(og.get("content"))
+            else:
+                _add(og.get("content"))
+
+        # 2) JSON-LD Product.image (often primary)
+        for s in soup.find_all("script", attrs={"type": "application/ld+json"}):
+            txt = (s.string or s.get_text() or "").strip()
+            if not txt:
+                continue
+            try:
+                data = json.loads(txt)
+            except Exception:
+                continue
+
+            nodes = data if isinstance(data, list) else [data]
+            for node in nodes:
+                if not isinstance(node, dict):
+                    continue
+                img = node.get("image")
+                if isinstance(img, str):
+                    if primary_url is None:
+                        _set_primary(img)
+                    else:
+                        _add(img)
+                elif isinstance(img, list):
+                    for x in img:
+                        if isinstance(x, str):
+                            _add(x)
+
+        # 3) Fotorama gallery frames (usually full gallery)
+        for img in soup.select(".fotorama__stage__frame img.fotorama__img"):
+            _add(img.get("src"))
+
+        # 4) Any explicit <img> tags pointing at scene7 canon assets (fallback)
+        for img in soup.find_all("img", src=True):
+            src = img.get("src") or ""
+            if "s7d1.scene7.com" in src and "/is/image/canon/" in src:
+                _add(src)
+
+        out: List[Dict[str, Any]] = []
+        for i, u in enumerate(urls):
+            kind = "primary" if (primary_url and u == primary_url) else "gallery"
+            out.append(
+                {
+                    "url": u,
+                    "kind": kind,
+                    "sort_order": i,
+                    "source": {"type": "web", "url": base_url},
+                    "raw_metadata": {},
+                }
+            )
+        return out
+
+    def _parse_canon_msrp_usd(self, soup: BeautifulSoup) -> Optional[float]:
+        """
+        Best-effort MSRP/price extraction from Canon shop HTML.
+
+        Preferred source: JSON-LD (Product/Offer.price).
+        Fallback: price-box DOM (data-price-amount).
+        """
+
+        def _as_float(v: Any) -> Optional[float]:
+            if v is None:
+                return None
+            if isinstance(v, (int, float)):
+                return float(v)
+            if isinstance(v, str):
+                s = v.strip()
+                if not s:
+                    return None
+                # "$6,799.00" -> "6799.00"
+                s = re.sub(r"[^0-9.]", "", s)
+                try:
+                    return float(s)
+                except Exception:
+                    return None
+            return None
+
+        # 1) JSON-LD
+        for s in soup.find_all("script", attrs={"type": "application/ld+json"}):
+            txt = (s.string or s.get_text() or "").strip()
+            if not txt:
+                continue
+            try:
+                data = json.loads(txt)
+            except Exception:
+                continue
+
+            nodes = data if isinstance(data, list) else [data]
+            for node in nodes:
+                if not isinstance(node, dict):
+                    continue
+
+                offers = node.get("offers")
+                offer_nodes: List[Dict[str, Any]] = []
+                if isinstance(offers, dict):
+                    offer_nodes = [offers]
+                elif isinstance(offers, list):
+                    offer_nodes = [o for o in offers if isinstance(o, dict)]
+
+                for offer in offer_nodes:
+                    currency = (offer.get("priceCurrency") or "").strip().upper()
+                    price = _as_float(offer.get("price"))
+                    if price is not None and (not currency or currency == "USD"):
+                        return price
+
+                # Some pages put "price" at the top-level node
+                price = _as_float(node.get("price"))
+                if price is not None:
+                    return price
+
+        # 2) DOM: Magento price box (avoid cart subtotal "$0.00")
+        price_span = soup.select_one(
+            ".product-info-price .price-box [data-price-type='finalPrice'][data-price-amount]"
+        )
+        if price_span and price_span.get("data-price-amount"):
+            return _as_float(price_span.get("data-price-amount"))
+
+        # 3) DOM fallback: any visible product-info-price .price text
+        price_text = soup.select_one(".product-info-price .price-box .price")
+        if price_text:
+            return _as_float(price_text.get_text(strip=True))
+
+        return None
+
     def _compute_completeness(self, manufacturer_sections: List[Dict[str, Any]], errors: List[str]) -> Dict[str, Any]:
         total_sections = len(manufacturer_sections)
         total_attributes = 0
@@ -299,6 +472,8 @@ class CanonCameraExtractor(BaseExtractor):
                         raw_html_path = self._save_raw_html(slug, html)
                     soup = BeautifulSoup(html, "html.parser")
                     manufacturer_sections = self._parse_canon_tech_specs(soup, base_url=url)
+                    images = self._parse_canon_product_images(soup, base_url=url)
+                    msrp_usd = self._parse_canon_msrp_usd(soup)
                     errors: List[str] = []
 
                     items.append(
@@ -307,6 +482,8 @@ class CanonCameraExtractor(BaseExtractor):
                             "product_slug": slug,
                             "raw_html_path": raw_html_path,
                             "manufacturer_sections": manufacturer_sections,
+                            "images": images,
+                            "msrp_usd": msrp_usd,
                             "errors": errors,
                             "completeness": self._compute_completeness(manufacturer_sections, errors),
                             "scraped_at": _utc_now_iso(),

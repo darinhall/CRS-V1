@@ -72,6 +72,8 @@ def _upsert_product(
     category_id: str,
     slug: str,
     manufacturer_url: Optional[str],
+    msrp_usd: Optional[float] = None,
+    primary_image_url: Optional[str] = None,
     raw_payload: Dict[str, Any],
 ) -> str:
     model = _humanize_slug(slug)
@@ -85,6 +87,8 @@ def _upsert_product(
             model,
             full_name,
             slug,
+            msrp_usd,
+            primary_image_url,
             manufacturer_url,
             source_url,
             raw_data,
@@ -94,12 +98,14 @@ def _upsert_product(
             created_at,
             updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'success', TRUE, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'success', TRUE, %s, %s)
         ON CONFLICT (slug) DO UPDATE SET
             brand_id = EXCLUDED.brand_id,
             category_id = EXCLUDED.category_id,
             model = EXCLUDED.model,
             full_name = EXCLUDED.full_name,
+            msrp_usd = COALESCE(EXCLUDED.msrp_usd, product.msrp_usd),
+            primary_image_url = COALESCE(EXCLUDED.primary_image_url, product.primary_image_url),
             manufacturer_url = COALESCE(EXCLUDED.manufacturer_url, product.manufacturer_url),
             source_url = COALESCE(EXCLUDED.source_url, product.source_url),
             raw_data = EXCLUDED.raw_data,
@@ -118,6 +124,8 @@ def _upsert_product(
                 model,
                 full_name,
                 slug,
+                msrp_usd,
+                primary_image_url,
                 manufacturer_url,
                 manufacturer_url,
                 Json(raw_payload),
@@ -353,6 +361,43 @@ def _upsert_document(conn, *, product_id: str, product: Dict[str, Any], doc: Dic
         )
 
 
+def _upsert_image(conn, *, product_id: str, product: Dict[str, Any], img: Dict[str, Any]) -> None:
+    sql = """
+        INSERT INTO product_image (
+            product_id,
+            url,
+            kind,
+            sort_order,
+            source_url,
+            raw_metadata
+        )
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON CONFLICT (product_id, url) DO UPDATE SET
+            kind = COALESCE(EXCLUDED.kind, product_image.kind),
+            sort_order = COALESCE(EXCLUDED.sort_order, product_image.sort_order),
+            source_url = COALESCE(EXCLUDED.source_url, product_image.source_url),
+            raw_metadata = COALESCE(EXCLUDED.raw_metadata, product_image.raw_metadata);
+    """
+
+    source_url = None
+    src = img.get("source") or {}
+    if isinstance(src, dict):
+        source_url = src.get("url") or product.get("manufacturer_url")
+
+    with conn.cursor() as cur:
+        cur.execute(
+            sql,
+            (
+                product_id,
+                img.get("url"),
+                img.get("kind"),
+                img.get("sort_order"),
+                source_url,
+                Json(img.get("raw_metadata") or {}),
+            ),
+        )
+
+
 def persist_normalized_json(
     config: PersistenceConfig,
     normalized_json_path: str,
@@ -372,6 +417,7 @@ def persist_normalized_json(
             "spec_records_upserted": 0,
             "matrix_cells_upserted": 0,
             "documents_upserted": 0,
+            "images_upserted": 0,
             "spec_records_skipped_missing_definition": 0,
             "matrix_records_skipped_missing_definition": 0,
         }
@@ -394,6 +440,8 @@ def persist_normalized_json(
                 category_id=category_id,
                 slug=product_slug,
                 manufacturer_url=manufacturer_url,
+                msrp_usd=product.get("msrp_usd"),
+                primary_image_url=product.get("primary_image_url"),
                 raw_payload={
                     "pipeline": {
                         "brand": payload.get("brand"),
@@ -446,6 +494,10 @@ def persist_normalized_json(
             for doc in item.get("documents", []) or []:
                 _upsert_document(conn, product_id=product_id, product=product, doc=doc)
                 counts["documents_upserted"] += 1
+
+            for img in item.get("images", []) or []:
+                _upsert_image(conn, product_id=product_id, product=product, img=img)
+                counts["images_upserted"] += 1
 
         conn.commit()
         return {

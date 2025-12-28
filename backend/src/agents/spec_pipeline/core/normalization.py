@@ -183,12 +183,37 @@ def normalize_extractions(
             raw_html_path = item.get("raw_html_path")
             extraction_errors = item.get("errors", []) or []
             extraction_completeness = item.get("completeness", {}) or {}
+            msrp_usd = item.get("msrp_usd")
 
             spec_records: List[Dict[str, Any]] = []
             unmapped: List[Dict[str, Any]] = []
             table_records: List[Dict[str, Any]] = []
             documents: List[Dict[str, Any]] = []
             matrix_records: List[Dict[str, Any]] = []
+            images: List[Dict[str, Any]] = []
+            primary_image_url: Optional[str] = None
+
+            for img in item.get("images", []) or []:
+                if not isinstance(img, dict):
+                    continue
+                url = (img.get("url") or "").strip()
+                if not url:
+                    continue
+                kind = img.get("kind")
+                if primary_image_url is None and kind == "primary":
+                    primary_image_url = _normalize_url(url)
+                images.append(
+                    {
+                        "url": _normalize_url(url),
+                        "kind": kind,
+                        "sort_order": img.get("sort_order"),
+                        "source": img.get("source") or {"type": "web", "url": product_url},
+                        "raw_metadata": img.get("raw_metadata") or {},
+                    }
+                )
+            if primary_image_url is None and images:
+                # fallback: first image in list
+                primary_image_url = images[0].get("url")
 
             for section in item.get("manufacturer_sections", []) or []:
                 section_name_raw = section.get("section_name", "") or ""
@@ -345,6 +370,8 @@ def normalize_extractions(
                         "product_type": config.product_type,
                         "slug": product_slug,
                         "manufacturer_url": product_url,
+                        "msrp_usd": msrp_usd,
+                        "primary_image_url": primary_image_url,
                     },
                     "extraction": {
                         "raw_html_path": raw_html_path,
@@ -355,12 +382,14 @@ def normalize_extractions(
                     "table_records": table_records,
                     "matrix_records": matrix_records,
                     "documents": documents,
+                    "images": images,
                     "unmapped": unmapped,
                     "run_summary": {
                         "mapped_count": len(spec_records),
                         "unmapped_count": len(unmapped),
                         "tables_count": len(table_records),
                         "documents_count": len(documents),
+                        "images_count": len(images),
                     },
                 }
             )

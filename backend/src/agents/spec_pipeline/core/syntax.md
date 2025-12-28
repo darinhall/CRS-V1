@@ -157,6 +157,10 @@ python3 backend/scripts/run.py --stage discovery
 - Optional fetched HTML artifact folder (only used if cache fallback is enabled):
   - `data/company_product/canon/processed_data/camera/raw_html/`
 
+**Product images captured**
+- Canon product page images are extracted from cached HTML and stored on each extraction item as:
+  - `images[]` (list of `{url, kind, sort_order, source, raw_metadata}`)
+
 **PDF links captured**
 - If a spec attribute contains a PDF link, extraction stores:
   - `context.pdf_url`
@@ -198,20 +202,26 @@ Optional/legacy helper:
 **Important policies**
 - Preserve `raw_value` verbatim for provenance.
 - Compute a cleaned `spec_value` for UI display (bullet/spacing normalization).
+- Clean obvious HTML artifacts in extracted labels/section names (e.g. `@999br/>`) so unmapped keys don’t fragment into duplicates.
 - Do not treat PDF links as specs:
   - they are emitted as `documents[]` in normalized output
   - and persisted into `product_document` via `--stage persist`
 - Table placeholders are kept in `table_records[]` and *select tables* are converted into `matrix_records[]`.
+- Do not treat product images as specs:
+  - they are emitted as `images[]` in normalized output
+  - and persisted into `product_image` via `--stage persist`
 
 **Output**
 - `data/company_product/canon/processed_data/camera/normalized.json`
 - Each product includes `run_summary` counts:
-  - mapped/unmapped/tables/documents
+  - mapped/unmapped/tables/documents/images
 - Each product also includes:
   - `extraction` (raw_html_path, extraction errors, completeness)
   - `needs_pdf` + `needs_pdf_reasons`
 - A PDF queue is generated for manual download:
   - `data/company_product/canon/processed_data/camera/pdf_queue.json`
+- An unmapped backlog report is generated for mapping sprints:
+  - `data/company_product/canon/processed_data/camera/unmapped_report.json`
 
 #### Table pipeline (implemented): Canon HTML tables → matrix_records
 
@@ -267,7 +277,7 @@ This keeps the pipeline moving without blocking on PDF extraction implementation
 
 Mappings live in the DB table `spec_mapping`. The workflow is:
 - run normalize
-- inspect `unmapped`
+- inspect `unmapped_report.json` (or per-product `unmapped[]` in `normalized.json`)
 - add context-aware mapping rules as migrations
 - reset/apply migrations
 - re-run normalize and re-check counts
@@ -277,6 +287,25 @@ Mappings live in the DB table `spec_mapping`. The workflow is:
 
 **Note on regex escaping**
 - We normalize double-backslashes when compiling regex in Python so the same patterns work when seeded via SQL.
+
+**Additional Canon mapping batches (example)**
+- `supabase/migrations/20251228006000_seed_spec_mapping_canon_camera_batch1.sql`
+- …
+- `supabase/migrations/20251228014000_seed_spec_mapping_canon_camera_batch8.sql`
+
+### Product images: persist image URLs as rows
+
+We store product image URLs in a dedicated table so they’re queryable and trackable (and can support primary vs gallery ordering).
+
+**DB**
+- Table: `product_image`
+- Migration: `supabase/migrations/20251228015000_add_product_image.sql`
+- Schema mirror: `backend/db/schema.sql`
+
+**How images work today**
+- We extract `images[]` from Canon HTML (og:image, JSON-LD, fotorama gallery, and Scene7 `<img>` fallbacks).
+- Normalization includes `images[]` in `normalized.json`.
+- Persistence (`--stage persist`) upserts images into `product_image`.
 
 ## Next steps (current roadmap)
 

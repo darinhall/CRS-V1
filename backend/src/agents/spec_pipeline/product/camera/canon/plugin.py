@@ -44,7 +44,7 @@ EXTRACTION_CONFIG = ExtractionConfig(
     brand_slug=BRAND_SLUG,
     product_type=PRODUCT_TYPE,
     headless=False,
-    max_products=5,  # keep small for first test; raise when stable
+    max_products=15,  # full Canon mirrorless set from discovery
     # Use your existing Canon HTML cache first.
     html_cache_dir="data/company_product/canon/raw_html",
     cache_only=True,

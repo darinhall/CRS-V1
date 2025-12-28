@@ -323,19 +323,27 @@ without changing the downstream normalization + DB writer.
 ```json
 {
   "brand": "canon",
+  "product_type": "camera",
   "category_slug": "mirrorless-cameras",
-  "listing_url": "https://www.usa.canon.com/shop/cameras/mirrorless-cameras",
-  "discovered": [
-    {
-      "product_url": "https://www.usa.canon.com/shop/p/eos-r6-mark-iii",
-      "product_slug_hint": "eos-r6-mark-iii",
-      "source_type": "web",
-      "confidence": 0.95
-    }
+  "listing_urls": ["https://www.usa.canon.com/shop/cameras/mirrorless-cameras"],
+  "product_url_pattern": "/shop/p/",
+  "discovery_date": "2025-12-28T04:16:22.936985+00:00",
+  "total_urls": 15,
+  "urls": [
+    "https://www.usa.canon.com/shop/p/eos-r6-mark-iii"
   ],
-  "run_metadata": {
-    "started_at": "2025-12-23T00:00:00Z",
-    "finished_at": "2025-12-23T00:01:00Z"
+  "stats": {
+    "duplicates_removed": 0,
+    "listing_urls": {
+      "https://www.usa.canon.com/shop/cameras/mirrorless-cameras": {
+        "url_pagination_pages_checked": 7,
+        "url_pagination_pages_with_products": 4,
+        "url_pagination_consecutive_empty_pages": 3,
+        "fragments_stripped": 40,
+        "excluded_urls": 181,
+        "excluded_by_substring": { "kit": 141 }
+      }
+    }
   }
 }
 ```
@@ -348,37 +356,39 @@ We standardize on a **list-of-sections** shape because it supports:
 
 ```json
 {
-  "source": {
-    "type": "web",
-    "url": "https://www.usa.canon.com/shop/p/eos-r6-mark-iii",
-    "retrieved_at": "2025-12-23T00:00:00Z"
-  },
-  "product": {
-    "brand_slug": "canon",
-    "category_slug": "mirrorless-cameras",
-    "model": "EOS R6 Mark III",
-    "full_name": "Canon EOS R6 Mark III",
-    "slug_hint": "eos-r6-mark-iii"
-  },
-  "manufacturer_sections": [
+  "brand": "canon",
+  "product_type": "camera",
+  "generated_at": "2025-12-28T04:17:37.953172+00:00",
+  "total_items": 15,
+  "items": [
     {
-      "section_name": "Image Sensor",
-      "attributes": [
-        {"raw_key": "Effective Pixels", "raw_value": "Approx. 32.5 million pixels"},
-        {"raw_key": "Sensor Type", "raw_value": "Full-frame CMOS"}
-      ]
-    },
-    {
-      "section_name": "Connectivity",
-      "attributes": [
-        {"raw_key": "Transmission Method", "raw_value": "Wi-Fi (IEEE 802.11ac), Bluetooth 5.1"}
-      ]
+      "product_url": "https://www.usa.canon.com/shop/p/eos-r6-mark-iii",
+      "product_slug": "eos-r6-mark-iii",
+      "raw_html_path": "data/company_product/canon/raw_html/eos-r6-mark-iii.html",
+      "manufacturer_sections": [
+        {
+          "section_name": "View Full Technical Specs PDF",
+          "attributes": [
+            {
+              "raw_key": "Techs. Specs. Detailed PDF",
+              "raw_value": "View Full Details of Technical Specification",
+              "context": {
+                "pdf_url": "https://s7d1.scene7.com/is/content/canon/EOSR6-Mark3-Spec-Sheetpdf"
+              }
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "completeness": {
+        "total_sections": 26,
+        "total_attributes": 139,
+        "tables_found": 0,
+        "pdf_urls_found": 1,
+        "needs_pdf": false
+      }
     }
-  ],
-  "raw_html_ref": {
-    "stored": false,
-    "note": "If stored, provide storage URI + hash for reproducibility"
-  }
+  ]
 }
 ```
 
@@ -389,81 +399,82 @@ Normalization emits a list of `spec_records[]`. Each record maps to exactly one 
 Policy:
 - **`raw_value` is preserved verbatim** for provenance/debugging.
 - **`spec_value` is cleaned deterministically** (whitespace + bullet cleanup) for UI display.
-- PDF links are **documents**, not specs: they are routed to `product_document` and surfaced as `documents[]` in normalized output.
-- HTML tables may be represented as `table_records[]` initially.
-  - First implemented conversion: Canon still-image **\"File Size\"** HTML table → `matrix_records[]` + `matrix_cells[]`.
+- PDF links are **documents**, not specs: they are surfaced as `documents[]` in normalized output and persisted into `product_document` during the `persist` stage.
+- HTML tables are emitted as `table_records[]` and selected tables are converted into `matrix_records[]` + `matrix_cells[]`.
+  - Implemented conversions: `still_image_file_size_table`, `playback_display_format_table`, `wifi_security_table`
 
 ```json
 {
-  "product": {
-    "brand_slug": "canon",
-    "category_slug": "mirrorless-cameras",
-    "slug": "eos-r6-mark-iii"
-  },
-  "spec_records": [
+  "brand": "canon",
+  "product_type": "camera",
+  "generated_at": "2025-12-28T04:17:37.953172+00:00",
+  "source_extractions_path": "data/company_product/canon/processed_data/camera/extractions.json",
+  "items": [
     {
-      "normalized_key": "effective_pixels",
-      "spec_value": "Approx. 32.5 MP",
-      "raw_value": "Approx. 32.5 million pixels",
-      "numeric_value": 32.5,
-      "unit_used": "MP",
-      "extraction_confidence": 0.95,
-      "source": {
-        "type": "web",
-        "url": "https://www.usa.canon.com/shop/p/eos-r6-mark-iii",
-        "section": "Image Sensor",
-        "label": "Effective Pixels"
-      }
-    },
-    {
-      "normalized_key": "gps",
-      "spec_value": "No (use smartphone GPS via Canon Camera Connect)",
-      "raw_value": "No built-in GPS; geotag via Canon Camera Connect",
-      "boolean_value": false,
-      "extraction_confidence": 0.9,
-      "source": {
-        "type": "web",
-        "url": "https://www.usa.canon.com/shop/p/eos-r6-mark-iii",
-        "section": "Connectivity",
-        "label": "GPS"
-      }
-    }
-  ],
-  "documents": [
-    {
-      "document_kind": "technical_specs_pdf",
-      "url": "https://www.usa.canon.com/.../some-tech-specs.pdf",
-      "source": {
-        "type": "web",
-        "url": "https://www.usa.canon.com/shop/p/eos-r6-mark-iii",
-        "section": "View Full Technical Specs PDF",
-        "label": "Techs. Specs. Detailed PDF"
-      }
-    }
-  ],
-  "matrix_records": [
-    {
-      "normalized_key": "still_image_recording_pixels",
-      "spec_value": "See product_spec_matrix",
-      "raw_value": "PDF table: Recording pixels — cropping & aspect ratios",
-      "raw_value_jsonb": {
-        "source": "canon_pdf",
-        "page": 1,
-        "notes": ["rounded values", "shaded = inexact proportion"],
-        "dims": ["media_type","image_size","aspect_ratio"],
-        "value_fields": ["mp","width_px","height_px","is_available","is_inexact"]
+      "product": {
+        "brand_slug": "canon",
+        "category_slug": "mirrorless-cameras",
+        "product_type": "camera",
+        "slug": "eos-r6-mark-iii",
+        "manufacturer_url": "https://www.usa.canon.com/shop/p/eos-r6-mark-iii"
       },
-      "matrix_cells": [
+      "extraction": {
+        "raw_html_path": "data/company_product/canon/raw_html/eos-r6-mark-iii.html",
+        "errors": [],
+        "completeness": {
+          "total_sections": 26,
+          "total_attributes": 139,
+          "tables_found": 0,
+          "pdf_urls_found": 1,
+          "needs_pdf": false
+        }
+      },
+      "spec_records": [
         {
-          "dims": {"media_type":"JPEG/HEIF","image_size":"L","aspect_ratio":"3:2"},
-          "numeric_value": 32.3,
-          "unit_used": "MP",
-          "width_px": 6960,
-          "height_px": 4640,
-          "is_available": true,
-          "is_inexact_proportion": false,
-          "notes": null,
-          "extraction_confidence": 1.0
+          "spec_definition_id": "00000000-0000-0000-0000-000000000000",
+          "normalized_key": "effective_pixels",
+          "spec_value": "Approx. 32.5 million pixels",
+          "raw_value": "Approx. 32.5 million pixels",
+          "numeric_value": null,
+          "boolean_value": null,
+          "unit_used": null,
+          "extraction_confidence": 0.9,
+          "source": {
+            "type": "web",
+            "url": "https://www.usa.canon.com/shop/p/eos-r6-mark-iii",
+            "section": "Image Sensor",
+            "label": "Effective Pixels"
+          }
+        }
+      ],
+      "table_records": [
+        {
+          "section": "Playback",
+          "label": "Display Format",
+          "raw_value": "[table]",
+          "converted_to_matrix": true
+        }
+      ],
+      "matrix_records": [
+        {
+          "normalized_key": "playback_display_format_table",
+          "spec_value": "See product_spec_matrix",
+          "raw_value": "HTML table: Display Format (Still Photo vs Movie)",
+          "matrix_cells": [
+            {
+              "dims": { "item": "Grid display" },
+              "value_text": {
+                "still_photo": "Off / 3×3 / 6×4 / 3×3+diag",
+                "movie": "-"
+              }
+            }
+          ]
+        }
+      ],
+      "documents": [
+        {
+          "document_kind": "technical_specs_pdf",
+          "url": "https://s7d1.scene7.com/is/content/canon/EOSR6-Mark3-Spec-Sheetpdf"
         }
       ]
     }
@@ -509,102 +520,9 @@ Policy:
 
 ---
 
-## 5-agent “family” breakdown (per product type)
+## Notes (practical)
 
-Your repo currently has these components:
+- **Spec definition IDs are environment-specific**: UUIDs in `normalized.json` are not stable across DB resets.
+  - Persist should resolve `spec_definition_id` by `normalized_key` in the current DB.
 
-- **`DiscoveryAgent`** (`backend/src/agents/discovery_agent.py`): Playwright discovery of product URLs
-- **`ExtractionAgent`** (`backend/src/agents/extraction_agent.py`): Playwright extraction of Canon spec groups (with TODO for table extraction)
-- **`normalization_agent.py`**: a multi-agent orchestration example (Extractor → Mapper → Validator → Enricher + Orchestrator)
-- **`SpecMapperService`** (`backend/src/services/spec_mapper.py`): regex-based mapping service (note: table names must match your singular schema)
-
-We standardize each product type into a 5-part “family”:
-
-1) **Discovery**: find product URLs and supporting artifacts (PDF/manuals)
-2) **Extraction**: pull raw manufacturer keys/values (and raw table structures)
-3) **Mapping/Normalization**: map raw keys → `normalized_key`, parse typed values, attach provenance, produce DB-ready records
-4) **Validation/QA**: schema + semantic validation, flag anomalies, assign quality score
-5) **Persistence**: upsert to DB (including matrix cells), log what changed
-
-Optional add-on (used when needed):
-
-- **Enrichment**: fill missing specs from trusted sources *only if you accept non-manufacturer sources*; keep provenance and lower confidence.
-
-### How this ties to your schema
-
-- **Discovery** feeds `product.source_url` and/or URL lists.
-- **Extraction** feeds raw JSON grouped by manufacturer section names.
-- **Normalization** produces:
-  - `spec_definition` (create missing keys)
-  - `product_spec` rows
-  - `product_spec_matrix` rows for table specs
-- **Validation** decides what is safe to write vs hold for review.
-- **Persistence** performs DB upserts and returns a summary (counts/conflicts).
-
----
-
-## Next-step LangChain plan (concrete)
-
-Goal: replace the ad-hoc “LLM returns prose” behavior with deterministic tool-driven extraction that emits the contract above.
-
-### Phase 1: Web extraction (Canon shop pages)
-
-- Wrap `discover_brand_products` as a LangChain tool (already done via `@tool`).
-- Wrap `extract_product_specs` as a LangChain tool (already done via `@tool`).
-- Extend `ExtractionAgent._parse_canon_specs` to:
-  - detect `<table>` blocks and extract them into structured JSON (rows/cols/cells)
-  - emit a `tables[]` section in extraction output (not just `"[Table Data]"`)
-
-### Phase 2: PDF extraction
-
-- Add a “PDF table extractor” tool:
-  - choose a deterministic library (e.g. `camelot`, `tabula`, or `pdfplumber`) for table extraction
-  - fallback to OCR for scanned PDFs
-- Emit `matrix_records[]` using the contract above.
-
-### Phase 3: Mapping/Normalization
-
-- Prefer DB-driven mapping rules (`spec_mapping`) for stability.
-- Use an LLM as a **fallback only** when no mapping rule exists:
-  - output: proposed mapping + confidence + rationale
-  - do not auto-write low-confidence mappings
-
-### Phase 4: DB writer
-
-- Upsert `product` row first (by `slug`)
-- Create/lookup `spec_definition` by `normalized_key`
-- Upsert `product_spec` by `(product_id, spec_definition_id)`
-- Upsert matrix cells by `(product_id, spec_definition_id, dims)`
-
-### Phase 5: QA loops
-
-- Maintain a “review queue” for:
-  - inferred values
-  - unit conflicts
-  - ambiguous keys
-  - missing required “tier 1” specs
-
----
-
-## Known pitfalls & how to avoid them (summary)
-
-- **PL/pgSQL variable conflicts** → prefix variables (`v_product_id`)
-- **denormalized keys/sections** → derive from joins, not stored text
-- **table specs in one text field** → use `product_spec_matrix` + views
-- **psql meta-commands in migrations** → migrations must be pure SQL
-- **local Supabase requires Docker** → start Docker daemon first
-- **avoid “edit init migration forever”** → add new migrations over time
-
----
-
-## Future extensions (when needed)
-
-- add a normalized “list item” table for filterable lists (optional)
-- materialized views for performance (only when needed)
-- embeddings/text-search “product doc” view for LLM retrieval (optional)
-
-## General Thoughts
-- using `discovery_agent.py` and `extraction_agent.py` as core classes for the extraction process
-- having each folder separate by product type (camera, lens, tripod, bags & cases, drones & aerial, etc.)
-- in each folder, there will be the following: init.py, product type specific agents (tailored queries or workflow for specific expected attribute keys and values), validators used to both secure data validity and agentically enhance the data if it is not found, and a file for json mappings 
-- agents will also have a config file that allows 
+- **Tables → matrices are intentional**: we only convert tables when we have a canonical matrix key + a deterministic parser.

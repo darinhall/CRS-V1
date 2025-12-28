@@ -26,7 +26,16 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--brand", default="canon")
     parser.add_argument("--product-type", default="camera")
-    parser.add_argument("--stage", default="discovery", choices=["discovery", "extraction", "normalize"])
+    parser.add_argument(
+        "--stage",
+        default="discovery",
+        choices=["discovery", "extraction", "normalize", "persist"],
+    )
+    parser.add_argument(
+        "--normalized-path",
+        default=None,
+        help="Override path to normalized JSON for persist stage.",
+    )
     args = parser.parse_args()
 
     plugin = load_plugin(args.brand, args.product_type)
@@ -42,7 +51,36 @@ def main() -> int:
         logging.info("Total URLs: %s", payload.get("total_urls"))
         return 0
 
-    # extraction stage
+    # stages requiring DB access
+    db_url = os.environ.get("DATABASE_URL") or os.environ.get("SUPABASE_DB_URL")
+    if args.stage in {"normalize", "persist"} and not db_url:
+        raise RuntimeError("Set DATABASE_URL (or SUPABASE_DB_URL).")
+
+    if args.stage == "persist":
+        from agents.spec_pipeline.core.persistence import (  # noqa: WPS433
+            PersistenceConfig,
+            persist_normalized_json,
+        )
+
+        normalized_config = getattr(plugin, "NORMALIZATION_CONFIG")
+        normalized_path = args.normalized_path or normalized_config.output_path
+
+        normalized_path_str = str(normalized_path)
+        normalized_abs = (
+            normalized_path_str
+            if normalized_path_str.startswith("/")
+            else str(repo_root / normalized_path_str)
+        )
+
+        report = persist_normalized_json(
+            PersistenceConfig(brand_slug=args.brand, product_type=args.product_type),
+            normalized_json_path=normalized_abs,
+            db_url=db_url,
+        )
+        logging.info("Persist report: %s", json.dumps(report, indent=2))
+        return 0
+
+    # stages requiring the discovery URL inventory
     url_inventory_path = repo_root / discovery_config.output_path
     if not url_inventory_path.exists():
         raise FileNotFoundError(
@@ -56,10 +94,6 @@ def main() -> int:
         return 0
 
     # normalize stage
-    db_url = os.environ.get("DATABASE_URL") or os.environ.get("SUPABASE_DB_URL")
-    if not db_url:
-        raise RuntimeError("Set DATABASE_URL (or SUPABASE_DB_URL) for normalization mapping.")
-
     normalize_fn = getattr(plugin, "normalize")
     normalized_output_path = normalize_fn(str(url_inventory_path), db_url=db_url)
     logging.info("Wrote normalized JSON: %s", normalized_output_path)

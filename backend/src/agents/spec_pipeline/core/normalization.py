@@ -8,7 +8,11 @@ import psycopg2
 
 from agents.spec_pipeline.core.extraction import _normalize_url
 from agents.spec_pipeline.core.text_normalizer import clean_text_for_spec_value
-from agents.spec_pipeline.core.table_normalizer import normalize_canon_still_file_size_table
+from agents.spec_pipeline.core.table_normalizer import (
+    normalize_canon_playback_display_format_table,
+    normalize_canon_still_file_size_table,
+    normalize_canon_wifi_security_table,
+)
 from services.spec_mapper import SpecMapperService
 
 
@@ -87,10 +91,16 @@ def normalize_extractions(
                             },
                         }
 
-                        # Attempt a first concrete table→matrix conversion: Canon still image \"File Size\" table.
+                        # Attempt concrete table→matrix conversions (Canon tables we explicitly support).
                         mapped_table = mapper.map_spec(raw_key=raw_key, raw_context=section_name, raw_value=raw_value)
-                        if mapped_table and (mapper.definitions.get(mapped_table["spec_definition_id"], {}).get("normalized_key") == "still_image_file_size_table"):
-                            table_html = (ctx.get("table_html") or "")
+                        mapped_key = None
+                        if mapped_table:
+                            mapped_key = mapper.definitions.get(mapped_table["spec_definition_id"], {}).get("normalized_key")
+
+                        table_html = (ctx.get("table_html") or "")
+                        converted = False
+
+                        if mapped_key == "still_image_file_size_table":
                             normalized = normalize_canon_still_file_size_table(table_html)
                             matrix_records.append(
                                 {
@@ -105,9 +115,43 @@ def normalize_extractions(
                                     "matrix_cells": normalized.get("cells", []),
                                 }
                             )
-                            table_rec["converted_to_matrix"] = True
-                        else:
-                            table_rec["converted_to_matrix"] = False
+                            converted = True
+
+                        if mapped_key == "playback_display_format_table":
+                            normalized = normalize_canon_playback_display_format_table(table_html)
+                            matrix_records.append(
+                                {
+                                    "normalized_key": "playback_display_format_table",
+                                    "spec_value": "See product_spec_matrix",
+                                    "raw_value": "HTML table: Display Format (Still Photo vs Movie)",
+                                    "raw_value_jsonb": {
+                                        "source": {"type": "web", "url": product_url, "section": section_name, "label": raw_key},
+                                        "dims": normalized.get("dims"),
+                                        "value_fields": normalized.get("value_fields"),
+                                    },
+                                    "matrix_cells": normalized.get("cells", []),
+                                }
+                            )
+                            converted = True
+
+                        if mapped_key == "wifi_security_table":
+                            normalized = normalize_canon_wifi_security_table(table_html)
+                            matrix_records.append(
+                                {
+                                    "normalized_key": "wifi_security_table",
+                                    "spec_value": "See product_spec_matrix",
+                                    "raw_value": "HTML table: Wi-Fi Security (Authentication/Encryption)",
+                                    "raw_value_jsonb": {
+                                        "source": {"type": "web", "url": product_url, "section": section_name, "label": raw_key},
+                                        "dims": normalized.get("dims"),
+                                        "value_fields": normalized.get("value_fields"),
+                                    },
+                                    "matrix_cells": normalized.get("cells", []),
+                                }
+                            )
+                            converted = True
+
+                        table_rec["converted_to_matrix"] = converted
 
                         table_records.append(
                             {

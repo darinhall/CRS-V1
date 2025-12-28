@@ -508,7 +508,7 @@ class CanonCameraExtractor(BaseExtractor):
 
 def extract(config: ExtractionConfig, product_urls: List[str]) -> Dict[str, Any]:
     brand = (config.brand_slug or "").lower()
-    if brand == "canon" and config.product_type == "camera":
+    if brand == "canon" and config.product_type in {"camera", "lens"}:
         return CanonCameraExtractor(config).extract(product_urls)
     raise ValueError(f"No extractor implementation for brand={config.brand_slug} product_type={config.product_type}")
 

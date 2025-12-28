@@ -58,6 +58,15 @@ Objective: reduce `unmapped_count` and map the **top ~200 UI-relevant** Canon ca
   - scope regex rules using `context_pattern` (section names) to avoid collisions (e.g. `Type`, `Coverage`, etc.)
 - Re-run normalize and spot-check 5–10 products for mis-maps.
 
+**Skip list (intentional non-mappings):**
+- `Folder`, `Folder Actions`, `Folder Name` buckets like `Still Photos` / `Movies`, and `News Metadata`
+  - Rationale: these describe on-card storage folder conventions, not product capabilities we plan to query/compare. The data remains in extraction + `normalized.json` provenance.
+- Playback-only UX features (map later only if UI explicitly needs them):
+  - examples: `Magnified View (still images)`, `AF Point Display (still images)`, `Auto Rotate`, `Search (video files only)`, `Ratings Star`, `Protect Images`, `Image Copy (to card in camera)`
+  - Rationale: these are playback/workflow features, not core product specs for comparison.
+- Canon section noise (map later only if we confirm stable section semantics):
+  - `Custom Controls` / `Customizable Dials` when extracted under `Video Calls / Streaming`
+
 ### [✓] T0378: **100% Complete** _(August 13, 2025)_
 **Canon Data Enrichment System Development**
 

@@ -22,6 +22,31 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _clean_extracted_label(text: str) -> str:
+    """
+    Best-effort cleanup for section/label strings coming from HTML extraction.
+
+    Goals:
+    - remove obvious HTML artifacts (tags, stray <br/> remnants)
+    - normalize whitespace/tab/newline noise
+    - keep the meaning intact (do not over-normalize)
+    """
+    s = (text or "").replace("\u00a0", " ").strip()
+    if not s:
+        return ""
+
+    # Remove HTML tags that may leak through extraction
+    s = re.sub(r"<[^>]+>", " ", s)
+
+    # Canon pages sometimes leak weird artifacts like "@999br/>" into labels
+    s = re.sub(r"@\s*\d+\s*br\s*/?>", " ", s, flags=re.IGNORECASE)
+
+    # Normalize tabs/newlines and collapse whitespace
+    s = s.replace("\t", " ").replace("\r", " ").replace("\n", " ")
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
 def _normalize_label_for_grouping(label: str) -> str:
     """
     Canonicalize a raw label for grouping in unmapped reports.
@@ -72,8 +97,8 @@ def build_unmapped_report(normalized_payload: Dict[str, Any]) -> Dict[str, Any]:
         product_url = product.get("manufacturer_url")
 
         for rec in it.get("unmapped", []) or []:
-            section = (rec.get("section") or "").strip()
-            label = (rec.get("label") or "").strip()
+            section = _clean_extracted_label(rec.get("section") or "")
+            label = _clean_extracted_label(rec.get("label") or "")
             raw_value = rec.get("raw_value")
 
             norm = _normalize_label_for_grouping(label)
@@ -166,9 +191,11 @@ def normalize_extractions(
             matrix_records: List[Dict[str, Any]] = []
 
             for section in item.get("manufacturer_sections", []) or []:
-                section_name = section.get("section_name", "") or ""
+                section_name_raw = section.get("section_name", "") or ""
+                section_name = _clean_extracted_label(section_name_raw)
                 for attr in section.get("attributes", []) or []:
-                    raw_key = attr.get("raw_key", "") or ""
+                    raw_key_raw = attr.get("raw_key", "") or ""
+                    raw_key = _clean_extracted_label(raw_key_raw)
                     raw_value = attr.get("raw_value", "") or ""
                     ctx = attr.get("context") or {}
 

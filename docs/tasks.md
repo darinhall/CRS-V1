@@ -37,7 +37,26 @@ This file serves as a historical record of all implementation work completed for
 
 ## Master Task List
 
-### Next Task ID: T0379
+### Next Task ID: T0380
+
+### [~] T0379: **60% Complete** _(December 28, 2025)_
+**Canon Camera Spec Mapping Coverage Sprint (DB-driven)**
+
+Objective: reduce `unmapped_count` and map the **top ~200 UI-relevant** Canon camera specs using DB-first `spec_mapping` rules and stable `spec_definition`s.
+
+**Key Achievements:**
+- ✅ **Unmapped Backlog Artifact**: normalization now emits `data/company_product/canon/processed_data/camera/unmapped_report.json` (aggregated + sorted by frequency, with examples).
+- ✅ **Seed Batch 1**: added first Canon-specific mapping migration batch under `supabase/migrations/`.
+
+**Current Workflow (rinse & repeat):**
+- Run normalize:
+  - `python3 backend/scripts/run.py --stage normalize`
+- Review backlog:
+  - `data/company_product/canon/processed_data/camera/unmapped_report.json`
+- Add mappings (via migrations):
+  - create new `spec_definition` only when the concept is stable
+  - scope regex rules using `context_pattern` (section names) to avoid collisions (e.g. `Type`, `Coverage`, etc.)
+- Re-run normalize and spot-check 5–10 products for mis-maps.
 
 ### [✓] T0378: **100% Complete** _(August 13, 2025)_
 **Canon Data Enrichment System Development**

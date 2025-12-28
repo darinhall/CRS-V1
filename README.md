@@ -24,11 +24,24 @@ Altoscope is a comprehensive platform designed to empower visual creators by sim
   - Studio runs at `http://127.0.0.1:54323`
 - Apply migrations locally:
   - `supabase db push --local`
+- Note: `supabase db push` applies **schema migrations only** (it does not copy scraped data).
 - Run the pipeline (Canon defaults):
   - `python3 backend/scripts/run.py --stage discovery`
   - `python3 backend/scripts/run.py --stage extraction`
   - `DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" python3 backend/scripts/run.py --stage normalize`
   - `DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" python3 backend/scripts/run.py --stage persist`
+
+## Persisting to Supabase cloud (data, not migrations)
+
+To write your scraped products/specs into **Supabase cloud**, set `DATABASE_URL` to the cloud Postgres connection string (Project Settings → Database → Connection string, use `sslmode=require`).
+
+- If you store `DATABASE_URL` in `.env`, `backend/scripts/run.py` will auto-load it (it checks `.env` / `.env.local` in repo root and `backend/`).
+- zsh tip: if your password contains `!`, wrap the whole URL in **single quotes** to avoid `event not found`:
+  - `export DATABASE_URL='postgresql://...:p@ssw0rd\!@db.<ref>.supabase.co:5432/postgres?sslmode=require'`
+
+Then run:
+
+- `python3 backend/scripts/run.py --stage persist`
 
 ## Next steps
 

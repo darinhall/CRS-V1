@@ -1,8 +1,10 @@
 import json
+import re
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import psycopg2
 
@@ -18,6 +20,114 @@ from services.spec_mapper import SpecMapperService
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _normalize_label_for_grouping(label: str) -> str:
+    """
+    Canonicalize a raw label for grouping in unmapped reports.
+
+    We keep this conservative: the goal is to group obvious variants
+    (case/spacing/punctuation), not to merge distinct concepts.
+    """
+    s = (label or "").strip().lower()
+    s = s.replace("\u00a0", " ")  # nbsp
+    s = s.rstrip(":")
+    # collapse whitespace
+    s = re.sub(r"\s+", " ", s)
+    # normalize some punctuation variants
+    s = s.replace("–", "-").replace("—", "-")
+    return s
+
+
+def build_unmapped_report(normalized_payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Build an aggregated report of unmapped attributes across all normalized items.
+
+    This is written to JSON for prioritization/diffing during a mapping sprint.
+    """
+    items = normalized_payload.get("items", []) or []
+
+    totals = {
+        "items": len(items),
+        "mapped_count": 0,
+        "unmapped_count": 0,
+        "tables_count": 0,
+        "documents_count": 0,
+    }
+
+    # normalized_label -> aggregations
+    raw_labels: Dict[str, Counter] = defaultdict(Counter)
+    sections: Dict[str, Counter] = defaultdict(Counter)
+    examples: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+
+    for it in items:
+        run_summary = it.get("run_summary") or {}
+        totals["mapped_count"] += int(run_summary.get("mapped_count") or 0)
+        totals["unmapped_count"] += int(run_summary.get("unmapped_count") or 0)
+        totals["tables_count"] += int(run_summary.get("tables_count") or 0)
+        totals["documents_count"] += int(run_summary.get("documents_count") or 0)
+
+        product = it.get("product") or {}
+        product_slug = product.get("slug")
+        product_url = product.get("manufacturer_url")
+
+        for rec in it.get("unmapped", []) or []:
+            section = (rec.get("section") or "").strip()
+            label = (rec.get("label") or "").strip()
+            raw_value = rec.get("raw_value")
+
+            norm = _normalize_label_for_grouping(label)
+            if not norm:
+                continue
+
+            raw_labels[norm][label or norm] += 1
+            if section:
+                sections[norm][section] += 1
+
+            # Keep a small set of examples per group.
+            if len(examples[norm]) < 6:
+                raw_value_str = raw_value if isinstance(raw_value, str) else json.dumps(raw_value, ensure_ascii=False)
+                raw_value_str = (raw_value_str or "").strip()
+                if len(raw_value_str) > 220:
+                    raw_value_str = raw_value_str[:220] + "…"
+
+                examples[norm].append(
+                    {
+                        "product_slug": product_slug,
+                        "product_url": product_url,
+                        "section": section,
+                        "label": label,
+                        "raw_value": raw_value_str,
+                    }
+                )
+
+    top_unmapped: List[Dict[str, Any]] = []
+    for norm, cnt in raw_labels.items():
+        total = sum(cnt.values())
+        # Most common raw label variant for readability.
+        top_raw, _ = cnt.most_common(1)[0]
+        top_unmapped.append(
+            {
+                "raw_label": top_raw,
+                "normalized_label": norm,
+                "count": total,
+                "sections": dict(sections[norm].most_common(12)),
+                "raw_label_variants": dict(cnt.most_common(12)),
+                "examples": examples[norm],
+                "suggested_action": "map_existing",  # placeholder; updated manually during sprint
+            }
+        )
+
+    top_unmapped.sort(key=lambda x: int(x.get("count") or 0), reverse=True)
+
+    return {
+        "generated_at": normalized_payload.get("generated_at") or _utc_now_iso(),
+        "brand": normalized_payload.get("brand"),
+        "product_type": normalized_payload.get("product_type"),
+        "item_count": len(items),
+        "totals": totals,
+        "top_unmapped": top_unmapped,
+    }
 
 
 @dataclass
@@ -167,6 +277,12 @@ def normalize_extractions(
                                 "section": section_name,
                                 "label": raw_key,
                                 "raw_value": raw_value,
+                                "source": {
+                                    "type": "web",
+                                    "url": product_url,
+                                    "section": section_name,
+                                    "label": raw_key,
+                                },
                             }
                         )
                         continue
@@ -257,7 +373,7 @@ def normalize_extractions(
                             }
                         )
 
-        return {
+        normalized_payload = {
             "brand": config.brand_slug,
             "product_type": config.product_type,
             "generated_at": _utc_now_iso(),
@@ -265,6 +381,20 @@ def normalize_extractions(
             "items": normalized_items,
             "pdf_queue": pdf_queue,
         }
+
+        # Also write an aggregated unmapped report alongside normalized output.
+        # This is a deterministic artifact used for mapping iteration loops.
+        try:
+            out_path = Path(config.output_path)
+            report_path = out_path.parent / "unmapped_report.json"
+            report = build_unmapped_report(normalized_payload)
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            # Never fail the core normalization output due to reporting.
+            pass
+
+        return normalized_payload
     finally:
         conn.close()
 

@@ -11,10 +11,38 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _load_env_files(repo_root: Path) -> None:
+    """
+    Load environment variables from common .env locations (best-effort).
+
+    This lets the pipeline run without requiring manual `export DATABASE_URL=...`
+    in every shell session.
+    """
+    try:
+        # Optional dependency (present in backend requirements)
+        from dotenv import load_dotenv  # type: ignore
+    except Exception:
+        return
+
+    # Precedence: backend/ .env should win over repo-root .env (common when backend
+    # has its own service-specific secrets).
+    candidates = [
+        repo_root / "backend" / ".env.local",
+        repo_root / "backend" / ".env",
+        repo_root / ".env.local",
+        repo_root / ".env",
+    ]
+    for p in candidates:
+        if p.exists():
+            load_dotenv(dotenv_path=str(p), override=False)
+            logging.info("Loaded env file: %s", p)
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
     repo_root = _repo_root()
+    _load_env_files(repo_root)
 
     # Ensure backend/src is importable (agents.*)
     backend_src = repo_root / "backend" / "src"

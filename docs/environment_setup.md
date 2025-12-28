@@ -103,6 +103,23 @@ The setup script supports these environment variables:
 - `ENV_PATH`: Custom location for virtual environment
 - `PYTHON_VERSION`: Python version to use (default: python3)
 
+## Pipeline DB connection (`DATABASE_URL`)
+
+The ingestion pipeline reads Postgres connection info from:
+
+- `DATABASE_URL` (preferred)
+- `SUPABASE_DB_URL` (fallback)
+
+`backend/scripts/run.py` will also auto-load variables from `.env` / `.env.local` in the repo root and `backend/` directory.
+
+### zsh note: `event not found`
+
+If your DB password contains `!`, zsh history expansion can throw `event not found`. Use single quotes:
+
+```bash
+export DATABASE_URL='postgresql://postgres:<password>@db.<project_ref>.supabase.co:5432/postgres?sslmode=require'
+```
+
 ## Common Locations
 
 The activation script checks these locations for the environment:

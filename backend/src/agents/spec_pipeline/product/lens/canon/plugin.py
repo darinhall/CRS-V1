@@ -27,7 +27,7 @@ DISCOVERY_CONFIG = DiscoveryConfig(
         "https://www.usa.canon.com/shop/lenses",
         # These are the only ones that are included in the pro website but not in commercial
         "https://www.usa.canon.com/shop/pro/lenses/cinema-lenses",
-        "https://www.usa.canon.com/shop/pro/lenses/broadcast-lenses",
+        "https://www.usa.canon.com/shop/pro/lenses/broadcast-lenses"
     ],
     product_url_pattern="/shop/p/",
     # Avoid adapters/filters/hoods/etc. when using the broad /shop/lenses entrypoint.

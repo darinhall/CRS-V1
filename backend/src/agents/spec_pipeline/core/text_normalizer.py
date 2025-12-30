@@ -21,6 +21,14 @@ def clean_text_for_spec_value(raw: Optional[str]) -> str:
     s = s.replace("\u2009", " ")  # thin space
     s = s.replace("\u202f", " ")  # narrow no-break space
 
+    # Convert HTML unicode to ASCII equivalents (preserve meaning for lens/camera names)
+    s = s.replace("\u2013", "-")      # en dash → hyphen (e.g., "28-70mm")
+    s = s.replace("\u2014", "—")      # em dash → em dash  
+    s = s.replace("\u2212", "-")      # minus sign → hyphen
+    s = s.replace("\u00f7", "/")      # division sign → slash (e.g., "F/2.8")
+    s = s.replace("\u2044", "/")      # fraction slash → slash
+    s = s.replace("\u2215", "/")      # division slash → slash
+
     # Turn bullets into newlines so UIs can render lists cleanly
     for b in _BULLETS:
         s = s.replace(b, "\n- ")

@@ -37,7 +37,48 @@ This file serves as a historical record of all implementation work completed for
 
 ## Master Task List
 
-### Next Task ID: T0380
+### Next Task ID: T0381
+
+### [⚠] T0380: **20% Complete** _(December 29, 2025)_
+**Canon Lens Spec Mapping Implementation (DB-driven)**
+
+Objective: Apply the same successful DB-driven mapping approach used for cameras to Canon lenses, reducing `unmapped_count` for lens specifications.
+
+**Current Status - Pattern Matching Issues:**
+- ✅ **Database Setup**: Created lens categories, spec definitions, and mapping rules
+- ✅ **Batched Approach**: Implemented batch 1-3 lens mappings (30 spec definitions, 189 total mapping rules)
+- ⚠️ **Pattern Matching Failed**: Despite correct database setup, patterns aren't matching actual data
+- ⚠️ **Mapping Effectiveness**: `unmapped_count` remains at 2738, `mapped_count` still 148 (no improvement)
+
+**Issues Identified:**
+1. **Pattern Complexity**: Regex patterns too complex/specific for actual Canon lens section names
+2. **Section Name Variations**: Canon uses inconsistent section naming across lens products
+3. **Context Matching**: `context_pattern` not matching real section names in extracted data
+4. **Examples from unmapped_report.json**:
+   - Weight appears in: "Main Unit Spec", "Dimensions, Weight", "Scene Composition" 
+   - Height appears in: "Physical Attributes", "Main Unit Spec", "Scene Composition"
+   - Our patterns expected more standardized section names
+
+**Attempted Fixes (All Ineffective):**
+- Case-insensitive pattern fixes
+- Broader context patterns  
+- Word boundary adjustments
+- Multiple pattern variations
+
+**Root Cause Speculation:**
+- Canon lens pages have different section naming conventions than cameras
+- Pattern matching logic in normalization pipeline may have issues with lens category
+- Need to analyze actual extracted lens data structure vs. our assumptions
+
+**Next Steps:**
+- Analyze actual lens extraction data structure
+- Compare successful camera patterns vs. failed lens patterns
+- Implement simpler, more permissive patterns based on real data
+- Consider different approach: section-agnostic matching for common specs like Weight, Height
+
+**Migration History Cleanup:**
+- Removed problematic lens mapping migrations to keep migration history clean
+- Will re-implement with working patterns once root cause identified
 
 ### [~] T0379: **95% Complete** _(December 28, 2025)_
 **Canon Camera Spec Mapping Coverage Sprint (DB-driven)**

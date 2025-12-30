@@ -1,4 +1,5 @@
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,10 +24,23 @@ def _humanize_slug(slug: str) -> str:
         return ""
 
     roman = {"i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"}
-    special_upper = {"eos", "rf", "ef", "ef-s"}
+    special_upper = {"eos", "rf", "ef", "ef-s", "rf-s", "cn", "kas", "ias"}
+
+    # Pre-process lens-specific patterns
+    s = slug
+    
+    # Handle f-stop notation (e.g., "f2-8" → "F/2.8", "f1-4" → "F/1.4")
+    s = re.sub(r'-f(\d+)-(\d+)', r'-F/\1.\2', s)
+    s = re.sub(r'f(\d+)-(\d+)', r'F/\1.\2', s)
+    
+    # Handle focal length ranges (e.g., "28-70mm" → "28-70mm")
+    s = re.sub(r'(\d+)-(\d+)mm', r'\1-\2mm', s)
+    
+    # Handle single focal lengths (e.g., "85mm" → "85mm") 
+    s = re.sub(r'(\d+)mm', r'\1mm', s)
 
     out: List[str] = []
-    for tok in slug.replace("_", "-").split("-"):
+    for tok in s.replace("_", "-").split("-"):
         t = tok.strip()
         if not t:
             continue
@@ -39,6 +53,12 @@ def _humanize_slug(slug: str) -> str:
             out.append("Mark")
         elif len(low) >= 2 and low[0] == "r" and low[1:].isdigit():
             out.append(low.upper())
+        elif low in {"is", "stm", "usm", "vcm", "pz", "macro", "do"}:
+            out.append(low.upper())
+        elif low.startswith("f/"):
+            out.append(low.upper())
+        elif low.endswith("mm"):
+            out.append(low)
         else:
             out.append(low.capitalize())
     return " ".join(out)

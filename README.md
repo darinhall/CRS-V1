@@ -1,8 +1,8 @@
 # CRS-V1 / Altoscope
 
-Altoscope is a comprehensive platform designed to empower visual creators by simplifying the research, discovery, and acquisition of professional camera equipment. By providing the industry's most robust and user-friendly database of gear specifications, Altoscope enables photographers and videographers to make informed decisions with unparalleled efficiency. Through seamlessly connecting this knowledge hub with rental houses, camera stores, and other various companies, Altoscope serves as a unified ecosystem for all visual media enthusiasts. The mission is to streamline the entire creative workflow, ensuring that every project or idea, from concept to completion, is supported by the right gear.
+Altoscope is a workflow SaaS designed to streamline the research, discovery, and acquisition of professional camera equipment for commercial productions. By leveraging the industry's most robust and user-friendly database of gear specifications, Altoscope turns fragmented public specs into actionable, compatibility-checked RFQs. We empower visual creators to move beyond simple comparison, enabling them to make informed decisions and build validated production kits with confidence. 
 
-## Current progress (what works today)
+## Current progress
 
 - **Normalized Postgres/Supabase schema** for gear specs:
   - `brand`, `product_category`, `product`, `spec_section`, `spec_definition`, `spec_mapping`, `product_spec`
@@ -33,9 +33,9 @@ Altoscope is a comprehensive platform designed to empower visual creators by sim
 
 ## Persisting to Supabase cloud (data, not migrations)
 
-To write your scraped products/specs into **Supabase cloud**, set `DATABASE_URL` to the cloud Postgres connection string (Project Settings → Database → Connection string, use `sslmode=require`).
+To write scraped products/specs into **Supabase cloud**, set `DATABASE_URL` to the cloud Postgres connection string (Project Settings → Database → Connection string, use `sslmode=require`).
 
-- If you store `DATABASE_URL` in `.env`, `backend/scripts/run.py` will auto-load it (it checks `.env` / `.env.local` in repo root and `backend/`).
+- With storing `DATABASE_URL` in `.env`, `backend/scripts/run.py` will auto-load it (it checks `.env` / `.env.local` in repo root and `backend/`).
 - zsh tip: if your password contains `!`, wrap the whole URL in **single quotes** to avoid `event not found`:
   - `export DATABASE_URL='postgresql://...:p@ssw0rd\!@db.<ref>.supabase.co:5432/postgres?sslmode=require'`
 
@@ -47,4 +47,5 @@ Then run:
 
 - **Mapping coverage sprint**: reduce `unmapped[]` by adding `spec_mapping` rules as migrations.
 - **More table→matrix converters** for high-value Canon tables, then expand brand coverage.
-- **PDF download + parsing** (later): store URLs now, parse deterministically later.
+- **PDF download + parsing** : currently storing PDF URLs, planniong to parse deterministically later.
+- **Possible agentic structure changing**: considering migrating to n8n with Typescript integration after 100% defined schema for spec attributes

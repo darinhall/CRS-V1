@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Activation script for CRS-V1 virtual environment
+# Activation script for CRS-V1 virtual environments
 ENV_NAME="website_scrapers_env"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 

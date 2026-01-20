@@ -88,7 +88,7 @@ def analyze_canon_files():
 
 
 def has_mirrorless_specifications(file_path):
-    """Check if a file contains mirrorless camera specifications."""
+    """Check if a file contains mirrorless camera specifications or not."""
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             html_content = f.read()
